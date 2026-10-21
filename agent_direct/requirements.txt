@@ -1,0 +1,5 @@
+# openai 3.26 (workload_identity) is newer than strands-agents[openai] allows (<3); verified working together.
+strands-agents==1.58.1
+openai==3.26.0
+strands-agents-tools==0.8.9
+bedrock-agentcore==1.24.1

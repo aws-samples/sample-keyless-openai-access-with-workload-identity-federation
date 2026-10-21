@@ -1,0 +1,26 @@
+.venv/
+infra/build/
+infra/cdk.out/
+console/outputs.json
+config.env
+__pycache__/
+build/
+
+# identity-flow diagrams (local only)
+diagrams/
+
+# video media and recording output (local only; frames-raw is UNMASKED)
+video/frames-raw/
+video/frames/
+video/screenshots/
+video/*.mp4
+video/*.log
+video/timing*.json
+
+# runtime state written by the setup scripts (real account / Okta / OpenAI IDs: local only)
+agent_state.json
+gateway/state.json
+.DS_Store
+
+# video recorder kit (local presenter aid; its leak lists hold the real IDs it masks)
+video/

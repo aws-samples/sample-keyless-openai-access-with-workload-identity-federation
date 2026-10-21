@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Okta → AgentCore → OpenAI · no keys</title>
+<script src="/vendor/tailwind.min.js"></script>
+<script src="/vendor/lucide.min.js"></script>
+<script>
+tailwind.config={theme:{extend:{fontFamily:{sans:["Inter","ui-sans-serif","system-ui","sans-serif"],mono:["ui-monospace","SFMono-Regular","Menlo","monospace"]},
+keyframes:{"fade-in":{"0%":{opacity:"0",transform:"translateY(4px)"},"100%":{opacity:"1",transform:"translateY(0)"}}},animation:{"fade-in":"fade-in .18s ease-out"}}}};
+</script>
+<style>
+  html,body{height:100%}
+  body{margin:0;font-family:Inter,ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:#fafafa;color:#18181b;font-feature-settings:"cv11","ss01"}
+  *{box-sizing:border-box}
+  .text-xs{font-size:13px !important;line-height:1.45 !important}
+  .text-sm{font-size:15px !important;line-height:1.55 !important}
+  .text-lg{font-size:20px !important}
+  .text-\[10px\]{font-size:12px !important}
+  .text-\[11px\]{font-size:13px !important}
+  .text-\[12px\]{font-size:13.5px !important}
+  .scroll-thin::-webkit-scrollbar{width:8px;height:8px}.scroll-thin::-webkit-scrollbar-thumb{background:#e4e4e7;border-radius:9999px}
+  [x-view]{display:none}[x-view].on{display:block;animation:fade-in .18s ease-out}
+  .agui-node{transform-box:fill-box;transform-origin:center;transition:opacity .3s ease;cursor:pointer}
+  .agui-node.dim{opacity:.4}
+  .agui-node.flash{animation:aguiflash 1.1s ease-out}
+  @keyframes aguiflash{0%{filter:drop-shadow(0 0 0 rgba(59,130,246,0))}22%{filter:drop-shadow(0 0 7px rgba(59,130,246,.6));transform:scale(1.035)}100%{filter:drop-shadow(0 0 0 rgba(59,130,246,0));transform:scale(1)}}
+  .agui-conn{transition:stroke-width .3s,opacity .3s;opacity:.55}
+  .agui-conn.lit{opacity:1;stroke-width:2.6}
+  .agui-conn.flow{opacity:1;stroke-width:2.8;stroke-dasharray:6 4;animation:aguidash .5s linear infinite;stroke:#3b82f6}
+  @keyframes aguidash{to{stroke-dashoffset:-20}}
+  .agui-dot{opacity:0}.agui-dot.active{opacity:1}
+  .agui-conn.denied{opacity:1;stroke:#e11d48 !important;stroke-width:2.2;stroke-dasharray:4 3;animation:none}
+  .agui-node.blocked rect.box{stroke:#e11d48 !important;stroke-width:2;stroke-dasharray:4 3}
+  .agui-node.blocked text.t{fill:#be123c !important}
+  .agui-node.ok rect.box{stroke:#10b981 !important;stroke-width:2}
+  .xnode{transition:box-shadow .2s,transform .2s}
+  .xnode:hover{box-shadow:0 0 0 3px rgba(59,130,246,.18);transform:translateY(-1px)}
+  .p1g{display:grid;grid-template-columns:minmax(0,430fr) 150px minmax(0,470fr) 150px minmax(0,400fr);row-gap:12px;align-items:stretch}
+  .p1hd{border-radius:12px;padding:8px 12px;font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+  .p1hd span{display:block;font-weight:400;letter-spacing:0;text-transform:none;font-size:11.5px;color:#71717a}
+  .p1box{background:#fff;border:1px solid #e4e4e7;border-left:4px solid #a1a1aa;border-radius:10px;padding:9px 11px;box-shadow:0 1px 2px #0000000d}
+  .p1box b{font-size:13.5px}.p1box ul{margin:5px 0 0;padding-left:17px;font-size:12.5px;color:#3f3f46;list-style:disc}.p1box li{margin:1px 0}
+  .p1cfg{font-size:10.8px;color:#a1a1aa;margin-top:5px;font-family:ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
+  .p1arr{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;font-size:11px;color:#c2410c;padding:0 6px}
+  .p1arr .ln{width:100%;display:flex;align-items:center}.p1arr .ln i{flex:1;border-top:2px dashed #ea580c;height:0}.p1arr .tip{color:#ea580c;font-size:16px;line-height:0}
+  .p3in{animation:p3in .45s ease-out both} @keyframes p3in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .p1n{display:inline-flex;width:18px;height:18px;border-radius:999px;background:#ea580c;color:#fff;font-size:11px;font-weight:700;align-items:center;justify-content:center;margin-bottom:3px}
+  .p1arr.tl{color:#0f766e}.p1arr.tl .ln i{border-top:2px solid #0d9488}.p1arr.tl .tip{color:#0d9488}.p1arr.tl .p1n{background:#0d9488}
+  .p1hide{opacity:0;pointer-events:none}.p1cell{transition:opacity .45s ease,box-shadow .3s;display:flex;flex-direction:column}.p1cell>.p1box,.p1cell>.p1arr{flex:1}
+  .p1new{box-shadow:0 0 0 3px rgba(37,99,235,.35),0 6px 16px -6px rgba(37,99,235,.35)!important}
+</style>
+</head>
+<body>
+<div id="app-shell" class="flex min-h-screen flex-col bg-zinc-50 transition-[margin] duration-300">
+  <header class="sticky top-0 z-40 border-b border-zinc-200 bg-white/85 backdrop-blur">
+    <div class="mx-auto flex w-[80vw] flex-wrap items-center justify-between gap-3 py-2.5">
+      <div class="flex items-center gap-2.5">
+        <div class="relative" id="nav-wrap">
+          <button id="nav-btn" type="button" title="WIF = Workload Identity Federation · click for the screens" class="inline-flex items-center gap-1 rounded-lg bg-zinc-900 py-1.5 pl-2 pr-1.5 text-[11px] font-bold text-white hover:bg-zinc-700">WIF<i data-lucide="chevron-down" class="h-3.5 w-3.5"></i></button>
+          <div id="nav-menu" class="hidden absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-lg"></div>
+        </div>
+        <div class="leading-tight">
+          <div class="text-sm font-semibold text-zinc-900">Okta → AgentCore → OpenAI <span id="nav-cur" class="ml-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-[11px] font-medium text-zinc-600"></span></div>
+          <div class="text-xs text-zinc-400" title="These GPT-5.6 models are also generally available on Amazon Bedrock, the simpler path when you don't need OpenAI's own API.">A person signs in · an agent acts for them · AgentCore Gateway calls OpenAI with IAM · no API key, no client secret</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="relative" id="user-wrap">
+          <button id="user-btn" type="button" class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600 hover:border-zinc-300">
+            <i data-lucide="user" class="h-3.5 w-3.5 text-zinc-400"></i> <span id="user-txt">not signed in</span><i data-lucide="chevron-down" class="h-3 w-3 text-zinc-400"></i></button>
+          <div id="user-menu" class="hidden absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-zinc-200 bg-white p-3 text-left shadow-lg"></div>
+        </div>
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-xs font-medium text-zinc-600"><i data-lucide="cloud" class="h-3.5 w-3.5 text-zinc-400"></i><span id="acct-txt">…</span></span>
+      </div>
+    </div>
+  </header>
+
+
+  <div class="mx-auto flex w-[80vw] flex-1 gap-6 py-5"><main class="min-w-0 flex-1">
+
+    <div x-view="sokta" class="space-y-5"><div id="setup-sokta"></div></div>
+    <div x-view="saws" class="space-y-5"><div id="setup-saws"></div></div>
+    <div x-view="sopenai" class="space-y-5"><div id="setup-sopenai"></div></div>
+
+    <div x-view="deploy" class="space-y-5">
+      <div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Provision</div>
+        <h2 class="text-lg font-semibold tracking-tight text-zinc-900">Five pieces, set up once</h2>
+        <p class="mt-1 text-sm text-zinc-500">Okta knows the person and the agent. AWS trusts Okta's tokens directly (IAM web identity), and IAM maps the person's team to its role. OpenAI trusts AWS. Live status; Details for the real values.</p></div>
+      <div id="deploy-cards" class="space-y-4"></div>
+      <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center gap-2 text-sm font-semibold text-zinc-900"><i data-lucide="terminal" class="h-4 w-4 text-zinc-400"></i> Run in order (terminal, from OpenAIFederation/)</div>
+        <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-6" id="deploy-cmds"></div>
+      </div>
+    </div>
+
+    <div x-view="uml" class="space-y-4"><div id="uml"></div></div>
+
+    <div x-view="arch" class="space-y-5">
+      <div class="flex flex-wrap items-end justify-between gap-3"><div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Architecture</div>
+        <div class="inline-flex gap-1 rounded-xl border border-zinc-200 bg-white p-1" id="arch-tabs"></div></div></div>
+      <div id="arch-p1"></div>
+      <div id="arch-p2" class="hidden"><div id="map"></div></div>
+      <div id="arch-p3" class="hidden"></div>
+    </div>
+
+    <div x-view="live" class="space-y-5">
+      <div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Live</div>
+        <h2 class="text-lg font-semibold tracking-tight text-zinc-900">One agent, two people: your identity rides every token up to OpenAI's</h2></div>
+      <div id="live-pending" class="hidden"></div>
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="flex flex-col rounded-xl border border-zinc-200 bg-white shadow-sm" style="min-height:780px">
+          <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="bot" class="h-4 w-4 text-blue-500"></i>
+            <span class="text-sm font-semibold text-zinc-900">Agent on AgentCore Runtime</span><span class="text-[11px] text-zinc-400">· Strands · the model comes from the configuration bundle</span></div>
+          <div class="space-y-3 border-b border-zinc-100 p-4"><div id="who-card"></div><div id="bundles"></div><div id="ask"></div></div>
+          <div id="chat" class="scroll-thin flex-1 space-y-3 overflow-auto p-4" style="max-height:440px"></div>
+          <div class="flex gap-2 border-t border-zinc-100 p-3">
+            <textarea id="chat-input" rows="2" class="flex-1 resize-none rounded-lg border border-zinc-200 bg-zinc-50/60 p-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30" placeholder="Ask the agent… (⌘↩ to send)"></textarea>
+            <button id="btn-send" class="inline-flex items-center gap-1.5 self-end rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40"><i data-lucide="send" class="h-4 w-4"></i> Send</button></div>
+        </div>
+        <div class="space-y-5">
+          <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="activity" class="h-4 w-4 text-orange-500"></i>
+              <span class="text-sm font-semibold text-zinc-900">Token flow</span><span class="text-[11px] text-zinc-400">· the real tokens from this run · click one to decode it</span>
+              <span id="flow-status" class="ml-auto inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium text-zinc-400">idle</span></div>
+            <div class="p-3"><div id="tflow"></div>
+              <div id="ticker" class="mt-2 border-t border-zinc-100 pt-2 font-mono text-[10px] text-zinc-400">idle: sign in, then ask the agent</div></div>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="fingerprint" class="h-4 w-4 text-emerald-600"></i>
+              <span class="text-sm font-semibold text-zinc-900">Evidence · who AWS minted the OpenAI token for</span><span class="text-[11px] text-zinc-400">· read live from AWS logs</span>
+              <button onclick="loadEvidence()" class="ml-auto rounded p-1 text-zinc-400 hover:bg-zinc-100"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button></div>
+            <div id="evidence" class="p-4"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div x-view="darch" class="space-y-5">
+      <div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Direct · architecture</div>
+        <div class="inline-flex gap-1 rounded-xl border border-zinc-200 bg-white p-1" id="darch-tabs"></div></div>
+      <div id="darch-p1"></div>
+      <div id="darch-p2" class="hidden"><div id="dmap"></div></div>
+      <div id="darch-p3" class="hidden"></div>
+    </div>
+
+    <div x-view="dlive" class="space-y-5">
+      <div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Direct · live</div>
+        <h2 class="text-lg font-semibold tracking-tight text-zinc-900">Same question, no Gateway: the AWS token still names you</h2></div>
+      <div id="dlive-pending" class="hidden"></div>
+      <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div class="flex flex-col rounded-xl border border-zinc-200 bg-white shadow-sm" style="min-height:700px">
+          <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="zap" class="h-4 w-4 text-blue-500"></i>
+            <span class="text-sm font-semibold text-zinc-900">Direct agent on AgentCore Runtime</span><span class="text-[11px] text-zinc-400">· Strands · OpenAI SDK · model from the configuration bundle</span></div>
+          <div class="space-y-3 border-b border-zinc-100 p-4"><div id="dwho-card"></div><div id="dbundles"></div><div id="dask"></div></div>
+          <div id="dchat" class="scroll-thin flex-1 space-y-3 overflow-auto p-4" style="max-height:440px"></div>
+          <div class="flex gap-2 border-t border-zinc-100 p-3">
+            <textarea id="dchat-input" rows="2" class="flex-1 resize-none rounded-lg border border-zinc-200 bg-zinc-50/60 p-2.5 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30" placeholder="Ask the direct agent… (⌘↩ to send)"></textarea>
+            <button id="dbtn-send" class="inline-flex items-center gap-1.5 self-end rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40"><i data-lucide="send" class="h-4 w-4"></i> Send</button></div>
+        </div>
+        <div class="space-y-5">
+          <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="activity" class="h-4 w-4 text-orange-500"></i>
+              <span class="text-sm font-semibold text-zinc-900">Token flow</span><span class="text-[11px] text-zinc-400">· the real tokens from this run · click one to decode it</span>
+              <span id="dflow-status" class="ml-auto inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium text-zinc-400">idle</span></div>
+            <div class="p-3"><div id="dtflow"></div>
+              <div id="dticker" class="mt-2 border-t border-zinc-100 pt-2 font-mono text-[10px] text-zinc-400">idle</div></div>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div class="flex items-center gap-2 border-b border-zinc-100 px-4 py-2.5"><i data-lucide="fingerprint" class="h-4 w-4 text-emerald-600"></i>
+              <span class="text-sm font-semibold text-zinc-900">Evidence · who AWS minted the OpenAI token for</span><span class="text-[11px] text-zinc-400">· read live from AWS logs</span>
+              <button onclick="loadEvidence()" class="ml-auto rounded p-1 text-zinc-400 hover:bg-zinc-100"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button></div>
+            <div id="devidence" class="p-4"></div>
+          </div>
+          <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm" id="dcompare"></div>
+        </div>
+      </div>
+    </div>
+
+    <div x-view="destroy" class="space-y-5">
+      <div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-rose-600">Delete resources</div><h2 class="text-lg font-semibold tracking-tight text-zinc-900">Remove the demo</h2></div>
+      <div class="rounded-xl border border-rose-200 bg-white p-5 shadow-sm" id="destroy-body"></div>
+    </div>
+  </main></div>
+</div>
+
+<div id="node-panel" class="fixed right-0 top-0 z-[55] flex h-full w-[600px] translate-x-full flex-col border-l border-zinc-200 bg-white shadow-2xl transition-transform duration-300">
+  <div class="flex items-center justify-between border-b border-zinc-100 px-4 py-3"><div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Key points</div>
+    <button id="node-panel-close" class="rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"><i data-lucide="x" class="h-4 w-4"></i></button></div>
+  <div id="node-panel-body" class="scroll-thin flex-1 overflow-auto px-4 py-3 text-sm"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const icons=()=>lucide.createIcons();
+let STATUS={}, CLAIMS=null, LAST=null, view="arch", BUSY=false;
+const IO={};
+const TEAMCLAIM="https://aws.amazon.com/tags/principal_tags/team";
+const cap=t=>t?t[0].toUpperCase()+t.slice(1):"";
+
+const V={
+  acct:()=>STATUS.account||"<account>", agent:()=>STATUS.okta?.agent||"<agent client id>",
+  usersIss:()=>STATUS.okta?.users_issuer||"https://<okta>/oauth2/<sign-in server>", gwIss:()=>STATUS.okta?.gateway_issuer||"https://<okta>/oauth2/<wif-gateway>",
+  awsIss:()=>STATUS.federation||"https://<id>.tokens.sts.global.api.aws", gwUrl:()=>STATUS.gateway?.url||"https://<gateway>/inference",
+  sa:t=>STATUS.gateway?.teams?.[t]?.sa||`<${t} service account>`, user:()=>STATUS.user?.login||"ada.lovelace@example.com", team:()=>STATUS.user?.team||"engineering",
+  group:()=>`wif-${STATUS.user?.team||"engineering"}`, models:()=>STATUS.gateway?.models||["gpt-5.6-sol","gpt-5.6-terra","gpt-5.6-luna"],
+  allowed:g=>(STATUS.gateway?.group_models||{"wif-engineering":["gpt-5.6-sol","gpt-5.6-luna"],"wif-finance":["gpt-5.6-terra","gpt-5.6-luna"]})[g||V.group()]||[],
+  openaiAllowed:g=>V.allowed(g).slice(0,1),   // each OpenAI project allows only the group's first model
+  idcUser:()=>STATUS.user?.login||"ada.lovelace@example.com",   // the person in AWS = the source identity (Okta login)
+  teamRole:t=>`arn:aws:iam::${STATUS.account||"<account>"}:role/OpenAIWifGateway${cap(t||STATUS.user?.team||"engineering")}Role`,
+};
+const pre=(t,cls="")=>`<pre class="scroll-thin mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-[11.5px] text-zinc-800 ${cls}">${esc(typeof t==="string"?t:JSON.stringify(t,null,1))}</pre>`;
+const more=(t,inner)=>`<details class="mt-3 rounded-lg border border-zinc-100 px-3 py-2"><summary class="cursor-pointer text-[12px] font-medium text-zinc-500">${t}</summary><div class="mt-2">${inner}</div></details>`;
+const sec=t=>`<div class="mt-4 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">${t}</div>`;
+const kv=rows=>`<table class="mt-1 w-full text-[12.5px]">${rows.map(([k,v,hi])=>`<tr class="border-b border-zinc-100 align-top"><td class="w-[150px] py-1 pr-2 font-mono text-[11.5px] ${hi?"font-semibold text-zinc-900":"text-zinc-500"}">${esc(k)}</td><td class="break-all py-1 font-mono text-[11.5px] ${hi?"text-blue-700":"text-zinc-700"}">${esc(typeof v==="object"?JSON.stringify(v):v)}</td></tr>`).join("")}</table>`;
+
+// ---------------- drawer: ≤3 points, one block of real data, the rest folded ----------------
+const NODES={
+  person:{t:"You · Ada or Grace",i:"user",p:["Sign in with Okta (top right). Ada is engineering, Grace is finance.","Same agent, same Gateway for both. Only the team differs.","Sign out to switch person."],
+    r:()=>CLAIMS?sec("signed in · decoded id_token")+kv([["login",CLAIMS.id_token.preferred_username,1],["team",CLAIMS.id_token[TEAMCLAIM],1],["aud (= the agent)",CLAIMS.id_token.aud]]):""},
+  okta:{t:"Okta · the AI agent's own app",i:"key-round",p:["You sign in to the agent's app <code>wif-openai-agent</code> (Okta for AI Agents).","It authenticates with private_key_jwt and a KMS key: no client secret exists.","You get an id_token (aud = the agent) and an access token for the Runtime."],
+    r:()=>CLAIMS?sec("your access token · decoded")+kv([["iss",CLAIMS.access_token.iss],["aud",CLAIMS.access_token.aud,1],["cid (the agent)",CLAIMS.access_token.cid,1],["scp",(CLAIMS.access_token.scp||[]).join(" ")]]):sec("sign-in server")+pre(V.usersIss())},
+  agent:{t:"Agent · Strands on AgentCore Runtime",i:"bot",p:["Runtime admits only Okta tokens issued to the agent (<code>cid</code> check).","The code checks the id_token is the caller's (sub = uid, aud = agent) before acting.","Tools are local: calculator, current_time. No model key, no AWS data access."],
+    r:()=>STATUS.runtime?sec("deployed")+kv([["runtime",STATUS.runtime.id,1],["role",STATUS.runtime.role],["workload identity",STATUS.runtime.workload]]):""},
+  step1:{t:"AgentCore Identity · step 1 · ID-JAG",i:"repeat",p:["Decorator <code>@requires_access_token(ON_BEHALF_OF_TOKEN_EXCHANGE)</code>.","AgentCore Identity sends your id_token to Okta, signing as the agent with its KMS key.","Okta returns an ID-JAG: sub = you, act = the agent."],
+    r:()=>sec("provider")+kv([["name",STATUS.runtime?.providers?.[0]||"openai-wif-step1"],["grant","TOKEN_EXCHANGE · id_token → id-jag"],["client auth","PRIVATE_KEY_JWT · KMS "+(STATUS.okta?.kid||"")]])},
+  step2:{t:"AgentCore Identity · step 2 · Gateway token",i:"stamp",p:["Second decorator: jwt-bearer grant to Okta's <code>wif-gateway</code> server.","Okta checks the agent's connection and your team group.","Token: sub = you, act = the agent, team = your team, aud = the Gateway."],
+    r:()=>sec("provider")+kv([["name",STATUS.runtime?.providers?.[1]||"openai-wif-step2"],["grant","JWT_AUTHORIZATION_GRANT (jwt-bearer)"],["issuer",V.gwIss()]])},
+  gateway:{t:"AgentCore Gateway · /inference",i:"door-open",p:["Inbound: Okta wif-gateway token, aud openai-wif-gateway, cid must be the agent.","One inference target, <code>openai</code>. Cedar: the agent acting for you, and your Okta <code>groups</code> claim decides which models you may use.","Forwards one allowlisted header, <code>X-Person-Token</code>, to the translator: header propagation, no interceptor Lambda."],
+    r:()=>STATUS.gateway?sec("deployed")+kv([["gateway",STATUS.gateway.id,1],["inbound",STATUS.gateway.auth],["Cedar",STATUS.gateway.policy],["url",STATUS.gateway.url]])+sec("models by Okta group")+kv(Object.entries(STATUS.gateway.group_models||{}).map(([g,m])=>[g,m.join(", "),1]))+more("Cedar (wif-engineering)",pre(`permit(principal is AgentCore::OAuthUser,
+  action in [AgentCore::Action::"openai___POST:/v1/chat/completions", …],
+  resource == AgentCore::Gateway::"<this gateway>")
+when { principal.getTag("cid") == "${V.agent()}" &&
+       principal.getTag("act") like "*${V.agent()}*" &&
+       principal.getTag("groups") like "*\\"wif-engineering\\"*" &&
+       ${JSON.stringify(V.allowed("wif-engineering"))}.contains(context.input.model) };`)):""},
+  translator:{t:"Translator · your identity → short-lived OpenAI token",i:"shuffle",p:["One Lambda for all teams. The Gateway calls it with SigV4 and passes your delegated token as <code>X-Person-Token</code>.","It hands your token to STS (AssumeRoleWithWebIdentity): the token is the credential, and IAM's trust policy admits it only into your team's role.","The session is yours (source identity = your login); it mints an AWS JWT and swaps it for a short-lived OpenAI token."],
+    r:()=>STATUS.gateway?.teams?sec("team tag → team role → OpenAI account")+kv(Object.entries(STATUS.gateway.teams).map(([t,v])=>[`team = ${t}`,`OpenAIWifGateway${cap(t)}Role → ${v.sa}`,1]))+more("Roles",pre("OpenAIWifTranslatorRole: logs only. It needs no AWS permission to act for you: your Okta token is the credential.\nTeam roles: trusted only by the Okta OIDC providers, for their own team tag; may only sts:GetWebIdentityToken (aud = OpenAI, ≤ 1 h).")):""},
+  idc:{t:"AWS STS · web identity · your session of the team role",i:"fingerprint",p:["AssumeRoleWithWebIdentity: your Okta token is the credential; an IAM OIDC provider trusts Okta.","IAM is the mapping: the team role's trust admits the token only if its <code>team</code> tag (from your Okta group) is that role's team.","The session carries you: source identity = your login, session tags team + user."],
+    r:()=>sec("your session")+kv([["source identity",V.user(),1],["session tags",`team = ${V.team()} · user = ${V.user()}`,1],["→ team role",V.teamRole(),1]])+more("Trust policy (the mapping)",pre(`Principal: { Federated: <IAM OIDC provider for Okta> }
+Action: sts:AssumeRoleWithWebIdentity + sts:TagSession
+Condition: <provider>:aud = <the token's audience>
+           aws:RequestTag/team = "${V.team()}"        // only this team's tag fits this role
+           aws:TagKeys only [team, user]
++ sts:SetSourceIdentity (source identity required)`))},
+  openai:{t:"OpenAI · trusts your AWS account",i:"sparkles",p:["Workload identity provider = your account's AWS issuer; nothing shared.","One mapping per team role → that team's service account and project.","The AWS JWT names you (source_identity, principal_tags.user); OpenAI's own token names the team service account."],
+    r:()=>sec("this deployment")+kv([["AWS issuer",V.awsIss()],["engineering →",V.sa("engineering"),1],["finance →",V.sa("finance"),1]])+more("The AWS JWT OpenAI receives",pre(`{ "sub": "${V.teamRole()}",
+  "aud": "https://api.openai.com/v1",
+  "https://sts.amazonaws.com/": { "source_identity": "${V.idcUser()}", "principal_tags": { "team": "${V.team()}", "user": "${V.idcUser()}" }, … } }`))},
+  idtok:{t:"Your Okta tokens · what they carry",i:"id-card",p:["id_token: aud = the agent. It proves you signed in to that agent.","access token: what the Runtime checks (cid = the agent, scope openai-agent.invoke).","Neither reaches the Gateway or OpenAI."],r:()=>CLAIMS?more("id_token claims",pre(CLAIMS.id_token))+more("access token claims",pre(CLAIMS.access_token)):""},
+  gwtok:{t:"Delegated Gateway token · what it carries",i:"file-key",p:["sub = you · act = the agent · team + groups = your group membership.","Issued by Okta to the agent, for the Gateway only (aud).","The Gateway authorizes and attributes on these claims, then passes the token on: the translator hands it to STS as your web identity."],
+    r:()=>LAST?.trace?.step2?sec("this run")+kv(Object.entries(LAST.trace.step2.gateway_token).map(([k,v])=>[k,v,["sub","act","team","groups"].includes(k)])):`<div class="mt-3 text-[12px] text-zinc-400">Ask the agent once on the Live screen.</div>`},
+};
+function nodeHtml(n){ const m=NODES[n]||{t:n,p:[]}, io=(view==="dlive"||view==="darch")&&typeof DIO!=="undefined"&&DIO[n]?DIO[n]:IO[n];
+  let h=`<div class="flex items-center gap-2"><div class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-white"><i data-lucide="${m.i||'box'}" class="h-4 w-4"></i></div><div class="font-semibold text-zinc-900">${esc(m.t)}</div></div>`;
+  h+=`<ul class="mt-3 space-y-2">`+m.p.map(p=>`<li class="flex gap-2 text-[14px] leading-snug text-zinc-700"><i data-lucide="check" class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"></i><span>${p}</span></li>`).join("")+`</ul>`;
+  if(io&&io.length){ h+=`<div class="mt-4 border-t border-zinc-100 pt-3 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">this run · what came in, what went out</div>`;
+    const blk=(l,v,tone)=>v==null||v===""?"":`<div class="mt-1.5 text-[11px] font-medium ${tone}">${l}</div>${pre(v)}`;
+    io.forEach(s=>{ h+=`<div class="mt-2 rounded-lg border ${s.bad?"border-rose-200 bg-rose-50/40":"border-zinc-100"} p-2">${s.label?`<div class="text-[12px] font-semibold ${s.bad?"text-rose-700":"text-zinc-700"}">${esc(s.label)}</div>`:""}${blk("in",s.in,"text-blue-600")}${blk("out",s.out,s.bad?"text-rose-600":"text-emerald-600")}</div>`; }); }
+  if(m.r) h+=m.r(); return h; }
+let _panel=null;
+function openNodePanel(n){ if(["person","okta","idtok"].includes(n)&&STATUS.user&&!CLAIMS) loadClaims().then(()=>_panel===n&&openNodePanel(n));
+  $("#node-panel-body").innerHTML=nodeHtml(n); $("#node-panel").classList.remove("translate-x-full"); $("#app-shell").style.marginRight="600px"; _panel=n; icons(); }
+function closeNodePanel(){ $("#node-panel").classList.add("translate-x-full"); $("#app-shell").style.marginRight=""; _panel=null; }
+document.addEventListener("click",e=>{ if(e.target.closest("#node-panel-close")){closeNodePanel();return;} if(e.target.closest("#node-panel")) return;
+  const g=e.target.closest('#flow .agui-node[data-node], #dflow .agui-node[data-node], [data-xnode]');
+  if(g){ const n=g.getAttribute("data-node")||g.getAttribute("data-xnode"); if(!n) return; e.stopPropagation(); if(_panel===n){closeNodePanel();return;} openNodePanel(n); return; }
+  if(_panel&&!e.target.closest("button")) closeNodePanel(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeNodePanel(); });
+
+// ---------------- nav + header ----------------
+const NAV=[{id:"sokta",label:"Setup · Okta",icon:"key-round"},{id:"saws",label:"Setup · AWS",icon:"cloud"},{id:"sopenai",label:"Setup · OpenAI",icon:"sparkles"},{id:"deploy",label:"Deploy",icon:"rocket"},{id:"uml",label:"1 · How it works (UML)",icon:"workflow"},{id:"arch",label:"2 · Through Gateway · Architecture",icon:"layers"},{id:"live",label:"3 · Through Gateway · Live",icon:"play"},{id:"darch",label:"4 · Direct · Architecture",icon:"git-branch"},{id:"dlive",label:"5 · Direct · Live",icon:"zap"},{id:"destroy",label:"Delete resources",icon:"trash-2",danger:true}];
+function renderNav(){ const cur=NAV.find(n=>n.id===view); $("#nav-cur").textContent=cur?cur.label:"";
+  $("#nav-menu").innerHTML=`<div class="px-2.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-400">WIF · Workload Identity Federation demo</div>`+NAV.map(n=>{ const on=view===n.id;
+    return `<button onclick="setView('${n.id}');$('#nav-menu').classList.add('hidden')" class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium ${n.danger?"mt-1 border-t border-zinc-100 text-rose-600 hover:bg-rose-50":on?"bg-zinc-900 text-white":"text-zinc-700 hover:bg-zinc-100"}"><i data-lucide="${n.icon}" class="h-4 w-4 shrink-0"></i><span>${n.label}</span>${on?'<i data-lucide="check" class="ml-auto h-4 w-4"></i>':""}</button>`; }).join(""); icons(); }
+document.addEventListener("click",e=>{ const m=$("#nav-menu"); if(!m) return; if(e.target.closest("#nav-btn")){ m.classList.toggle("hidden"); return; } if(!e.target.closest("#nav-menu")) m.classList.add("hidden"); });
+function setView(id){ view=id; $$("[x-view]").forEach(v=>v.classList.toggle("on",v.getAttribute("x-view")===id)); renderNav(); history.replaceState(null,"","#"+id); closeNodePanel();
+  ({sokta:()=>renderSetup("sokta"),saws:()=>renderSetup("saws"),sopenai:()=>renderSetup("sopenai"),deploy:renderDeploy,uml:renderUML,arch:renderArch,live:renderLive,darch:renderDArch,dlive:renderDLive,destroy:renderDestroy}[id]||(()=>{}))(); }
+function renderHeader(){ const u=STATUS.user;
+  $("#acct-txt").textContent=STATUS.account?`${STATUS.account} · ${STATUS.region}`:(STATUS.error?"no AWS credentials":"…");
+  $("#user-txt").textContent=u?`${u.login.split("@")[0]} · ${u.team||"?"}`:"not signed in";
+  $("#user-menu").innerHTML=u?`<div class="text-[12px] text-zinc-500">Signed in to the agent's Okta app</div><div class="mt-0.5 font-mono text-[13px] text-zinc-900">${esc(u.login)}</div><div class="mt-1 text-[12px] text-zinc-500">team <b class="text-zinc-800">${esc(u.team||"?")}</b></div>
+      <a href="/logout" class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"><i data-lucide="log-out" class="h-4 w-4"></i> Sign out · switch person</a>`
+    :`<div class="text-[13px] text-zinc-600">Sign in as <b>ada.lovelace@example.com</b> (engineering) or <b>grace.hopper@example.com</b> (finance).</div>
+      <a href="/login" class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 ${STATUS.okta?.configured?"":"pointer-events-none opacity-40"}"><i data-lucide="key-round" class="h-4 w-4"></i> Sign in with Okta</a>`; icons(); }
+$("#user-btn").onclick=e=>{ e.stopPropagation(); $("#user-menu").classList.toggle("hidden"); };
+document.addEventListener("click",e=>{ if(!e.target.closest("#user-wrap")) $("#user-menu").classList.add("hidden"); });
+
+// ---------------- deploy ----------------
+const pill=(ok,y,n)=>`<span class="rounded-full px-2 py-0.5 text-[10px] font-medium ${ok?"bg-emerald-50 text-emerald-600":"bg-amber-50 text-amber-700"}">${ok?y:n}</span>`;
+const mono=t=>`<span class="font-mono">${esc(t)}</span>`;
+const RAIL={emerald:["border-l-emerald-500","bg-emerald-600"],violet:["border-l-violet-500","bg-violet-600"],blue:["border-l-blue-500","bg-blue-600"],orange:["border-l-orange-500","bg-orange-600"],teal:["border-l-teal-500","bg-teal-600"]};
+function rail(n,c,icon,title,ok,y,no,items,node){ return `<div class="overflow-hidden rounded-xl border border-l-4 border-zinc-200 ${RAIL[c][0]} bg-white shadow-sm"><div class="flex flex-wrap items-start gap-4 p-5">
+  <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${RAIL[c][1]} text-white"><i data-lucide="${icon}" class="h-5 w-5"></i></div>
+  <div class="min-w-0 flex-1"><div class="flex items-center gap-2"><div class="text-sm font-semibold text-zinc-900">${n} · ${title}</div>${pill(ok,y,no)}</div>
+    <ul class="mt-2 grid grid-cols-1 gap-x-5 gap-y-1 text-xs text-zinc-600 sm:grid-cols-2">${items.map(([i,t])=>`<li class="flex items-center gap-2"><i data-lucide="${i}" class="h-3.5 w-3.5 shrink-0 text-zinc-400"></i><span class="min-w-0 truncate">${t}</span></li>`).join("")}</ul></div>
+  <button onclick="openNodePanel('${node}')" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"><i data-lucide="info" class="h-4 w-4 text-zinc-400"></i> Details</button></div></div>`; }
+// ---------------- Setup · Okta / AWS / OpenAI (the org, account and org already exist) ----------------
+function setupModel(k){ const S=STATUS, st=S.setup||{}, ok=S.okta||{}, om=S.openai_map||{teams:{}}, t=om.teams||{}, ob=S.observability||{}, acct=S.account||"111122223333", asid=u=>(u||"").split("/").pop();
+  const role=n=>`arn:aws:iam::${mask(acct)}:role/OpenAIWifGateway${n}Role`, M=(v,a,b)=>esc(mask(v,a,b));
+  if(k==="sokta") return {c:"#8b5cf6", icon:"key-round", kicker:"Setup · Okta", title:"Okta: the people, their groups, and the agent",
+    have:`An Okta org: ${esc(mask(st.okta_domain||"your-org.okta.com",13,9))} (Okta for AI Agents enabled)`,
+    steps:[
+      {t:"Admin API token",why:"The setup scripts create everything below through Okta's API.",how:["console","Okta Admin › Security › API › Tokens › Create token → config.env: OKTA_DOMAIN, OKTA_API_TOKEN"],v:st.okta_domain?`${esc(st.okta_domain)} · token ${st.okta_token?"set":"missing"}`:"",ok:!!(st.okta_domain&&st.okta_token)},
+      {t:"Groups and people",why:"The group is the team: it decides the models (Cedar) and the AWS role (IAM).",how:["cmd","python okta_setup.py"],v:`wif-engineering ← ${esc((st.people?.engineering||[]).join(", ")||"ada.lovelace@…")} · wif-finance ← ${esc((st.people?.finance||[]).join(", ")||"grace.hopper@…")}`,ok:Object.keys(st.groups||{}).length===2},
+      {t:"AI agent · wif-openai-agent",why:"Gives the agent its own Okta identity. It signs with a KMS key (private_key_jwt), so it holds no secret.",how:["cmd","python okta_agent_setup.py"],v:`client ${M(ok.agent,6,5)} · key ${esc(ok.kid||"wif-openai-agent-kms")}`,ok:!!ok.agent},
+      {t:"The agent's sign-in app",why:"People sign in to the agent's own app, so their id_token is issued to the agent (needed for delegation).",how:["cmd","python okta_agent_setup.py"],v:`app ${M(st.app_id,5,4)} · redirect ${esc(st.redirect_uri||"http://localhost:8090/callback")}`,ok:!!st.app_id},
+      {t:"Sign-in authorization server",why:"Issues the access token AgentCore Runtime accepts (scope openai-agent.invoke).",how:["cmd","python okta_setup.py · python okta_agent_setup.py"],v:`${M(asid(ok.users_issuer),6,4)} · aud openai-wif-demo · scope ${esc(st.invoke_scope||"openai-agent.invoke")}`,ok:!!ok.users_issuer},
+      {t:"wif-gateway authorization server",why:"Issues the delegated token the Gateway accepts: sub = the person, act = the agent, plus team and groups.",how:["cmd","python okta_agent_setup.py"],v:`${M(asid(ok.gateway_issuer),6,4)} · aud openai-wif-gateway · scope ${esc(st.gateway_scope||"inference:invoke")}`,ok:!!ok.gateway_issuer},
+      {t:"Connection: the agent may act for people",why:"Only this agent, only for signed-in wif-* members, only scope inference:invoke (ID-JAG, jwt-bearer).",how:["cmd","python okta_agent_setup.py"],v:"agent → wif-gateway · groups wif-engineering, wif-finance",ok:!!(ok.gateway_issuer&&st.gateway_scope)},
+      {t:"Claims STS reads",why:"source_identity and the team/user session tags, in the names AssumeRoleWithWebIdentity reads. Added to both servers' access tokens.",how:["cmd","python webid_setup.py up   (after Deploy creates the team roles)"],v:"https://aws.amazon.com/source_identity · …/tags/principal_tags/team · …/user",ok:!!S.webid?.gateway_provider}],
+    next:["saws","Setup · AWS"]};
+  if(k==="saws") return {c:"#f97316", icon:"cloud", kicker:"Setup · AWS", title:"AWS: the account-level pieces",
+    have:`An AWS account: ${esc(mask(acct))} · ${esc(S.region||"us-east-1")} (AgentCore available in the Region)`,
+    steps:[
+      {t:"Credentials",why:"The scripts and this console use one admin profile to create IAM roles, AgentCore resources and the Lambda.",how:["cmd","aws configure sso   # then set AWS_PROFILE and AWS_REGION in config.env"],v:S.account?`account ${esc(mask(acct))}`:esc(S.error||""),ok:!!S.account},
+      {t:"Outbound identity federation (IAM)",why:"Lets STS sign JWTs that OpenAI can verify, and gives the account its issuer URL (OpenAI needs it).",how:["cmd","aws iam enable-outbound-web-identity-federation   # or IAM › Account settings"],v:S.federation?esc(mask(S.federation.replace("https://","").split(".")[0],4,4)+"."+S.federation.replace("https://","").split(".").slice(1).join(".")):"",ok:!!S.federation},
+      {t:"KMS key for the agent",why:"The agent's private signing key. It never leaves KMS; Okta holds the public half.",how:["cmd","python okta_agent_setup.py   (creates alias/openai-wif-agent)"],v:ok.kms?`alias/openai-wif-agent · ${M(ok.kms.split("/").pop(),4,4)}`:"",ok:!!ok.kms},
+      {t:"CloudWatch Transaction Search",why:"Sends spans to CloudWatch Logs (aws/spans) so GenAI Observability can show AgentCore traces. One time per account.",how:["cmd","python observability_setup.py up"],v:ob.destination?`trace segments → ${esc(ob.destination)} (${esc(ob.destination_status||"")}) · 1% indexed`:"",ok:ob.destination==="CloudWatchLogs"&&ob.destination_status==="ACTIVE"},
+      {t:"Gateway logs and traces",why:"The Gateway's own logs and spans, in GenAI Observability › Bedrock AgentCore › Gateways.",how:["cmd","python observability_setup.py up   (after Deploy creates the Gateway)"],v:ob.log_group?`logs → ${esc(ob.log_group.replace(/APPLICATION_LOGS\/.*/,"APPLICATION_LOGS/…"))} · traces → X-Ray`:"",ok:!!(ob.gateway_logs&&ob.gateway_traces)}],
+    next:["sopenai","Setup · OpenAI"]};
+  return {c:"#14b8a6", icon:"sparkles", kicker:"Setup · OpenAI", title:"OpenAI: trust the AWS account, map each team role", note:"For OpenAI's own API. The same GPT-5.6 models are also generally available on Amazon Bedrock, where IAM controls access without federation.",
+    have:`An OpenAI organization: ${esc(mask(om.org_id||"org-EXAMPLE",8,4))} (owner access)`,
+    steps:[
+      {t:"Workload identity provider",why:"Makes OpenAI trust tokens from this AWS account, instead of API keys.",how:["console","OpenAI dashboard › Organization settings › Workload identity federation › Add provider: issuer = the AWS issuer (Setup · AWS step 2), audience https://api.openai.com/v1"],v:om.identity_provider_id?`${M(om.identity_provider_id,8,4)} · issuer ${M((om.aws_issuer||"").replace("https://","").split(".")[0],4,4)}.tokens.sts…`:"",ok:!!om.identity_provider_id},
+      {t:"Projects, one per team",why:"Each team's usage and model access live in its own project.",how:["console","OpenAI dashboard › Projects › Create: Engineering, Finance"],v:`Engineering ${M(t.engineering?.project_id,6,4)} · Finance ${M(t.finance?.project_id,6,4)}`,ok:!!(t.engineering?.project_id&&t.finance?.project_id)},
+      {t:"Model limits per project",why:"OpenAI's own control, under Cedar's: Engineering may use only gpt-5.6-sol, Finance only gpt-5.6-terra.",how:["console","Project › Limits › Model usage: allow only that model"],v:`Engineering → ${esc((t.engineering?.project_models||["gpt-5.6-sol"]).join(", "))} · Finance → ${esc((t.finance?.project_models||["gpt-5.6-terra"]).join(", "))}`,ok:null,note:"Can't be read without an OpenAI admin key. Check it on 3 · Live: the luna bundle should say “Refused by OpenAI”."},
+      {t:"Service account per project",why:"Who OpenAI says made the call. No key is created or stored: tokens come from the exchange.",how:["console","Project › Service accounts › Create → config.env: OPENAI_SA_ENGINEERING, OPENAI_SA_FINANCE"],v:`Engineering ${M(t.engineering?.service_account_id,9,4)} · Finance ${M(t.finance?.service_account_id,9,4)}`,ok:!!(t.engineering?.service_account_id&&t.finance?.service_account_id)},
+      {t:"Mappings: team role → service account",why:"The AWS JWT's sub is the team role; the mapping turns it into that team's service account.",how:["console",`Workload identity provider › Mappings › Add: gateway-engineering: sub == ${role("Engineering")} → Engineering SA · gateway-finance: the same with ${role("Finance")}`],v:`${esc(t.engineering?.mapping_name||"gateway-engineering")} ${M(t.engineering?.mapping_id,6,4)} · ${esc(t.finance?.mapping_name||"gateway-finance")} ${M(t.finance?.mapping_id,6,4)}`,ok:!!(t.engineering?.mapping_id&&t.finance?.mapping_id)},
+      {t:"Test the exchange",why:"Each team role's AWS JWT exchanges for an OpenAI token (HTTP 200); the other team's is refused.",how:["cmd","python webid_setup.py test grace   (after Deploy)"],v:Object.values(S.gateway?.teams||{}).every(x=>x.sa)&&S.gateway?.teams?"both teams exchange OK":"",ok:!!(S.gateway?.teams&&Object.values(S.gateway.teams).every(x=>x.sa))}],
+    next:["deploy","Deploy"]}; }
+function renderSetup(k){ const m=setupModel(k), done=m.steps.filter(x=>x.ok).length;
+  const pill=o=>o===true?'<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">done</span>':o===false?'<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">to do</span>':'<span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">check</span>';
+  $(`#setup-${k}`).innerHTML=`<div><div class="mb-1 text-xs font-semibold uppercase tracking-wide" style="color:${m.c}">${m.kicker}</div><h2 class="text-lg font-semibold tracking-tight text-zinc-900">${m.title}</h2>
+      <div class="mt-2 inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12.5px] text-zinc-600"><i data-lucide="check-circle-2" class="h-4 w-4 text-emerald-600"></i>Assumed to exist: ${m.have}</div>${m.note?`<div class="mt-2 text-[12.5px] text-zinc-500">${m.note}</div>`:""}
+      <span class="ml-2 text-[12px] text-zinc-400">${done} of ${m.steps.length} done</span></div>
+    <ol class="space-y-2.5">${m.steps.map((x,i)=>`<li class="flex gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm" style="border-left:4px solid ${m.c}">
+      <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white" style="background:${m.c}">${i+1}</div>
+      <div class="min-w-0 flex-1"><div class="flex flex-wrap items-center gap-2"><b class="text-[14px] text-zinc-900">${x.t}</b>${pill(x.ok)}</div>
+        <div class="mt-0.5 text-[13px] text-zinc-600">${x.why}</div>
+        <div class="mt-2 flex items-start gap-2 text-[12.5px]"><i data-lucide="${x.how[0]==="cmd"?"terminal":"mouse-pointer-click"}" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400"></i>${x.how[0]==="cmd"?`<code class="rounded bg-zinc-900 px-2 py-0.5 font-mono text-[12px] text-zinc-100">${esc(x.how[1])}</code>`:`<span class="text-zinc-700">${x.how[1]}</span>`}</div>
+        ${x.v?`<div class="mt-1.5 truncate font-mono text-[11.5px] text-zinc-500" title="${x.v.replace(/"/g,"&quot;")}">${x.v}</div>`:""}${x.note?`<div class="mt-1 text-[12px] text-amber-700">${x.note}</div>`:""}</div></li>`).join("")}</ol>
+    <div class="flex items-center justify-between text-[12px] text-zinc-400"><span>Live status from this account and the scripts' state files · IDs partially masked</span>
+      <button onclick="setView('${m.next[0]}')" class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-zinc-700">Next: ${m.next[1]} <i data-lucide="arrow-right" class="h-4 w-4"></i></button></div>`;
+  icons(); }
+function renderDeploy(){ const s=STATUS, g=s.gateway||{}, r=s.runtime||{};
+  $("#deploy-cards").innerHTML=
+    rail(1,"violet","key-round","Okta · the person and the agent",s.okta?.configured,"configured","not configured",[["bot",`AI agent ${mono("wif-openai-agent")} · private_key_jwt (KMS)`],["app-window",`Sign-in: the agent's own app · scope ${mono("openai-agent.invoke")}`],["server",`${mono("wif-gateway")} server: sub · act · team · groups`],["users",`Groups ${mono("wif-engineering")} (Ada) · ${mono("wif-finance")} (Grace)`]],"okta")+
+    rail(2,"blue","bot","AgentCore Runtime · the agent",r.status==="READY","ready","not deployed",[["bot",`Strands agent ${mono(r.id||"openai_wif_agent")}`],["log-in","Inbound: Okta token with cid = the agent"],["repeat",`AgentCore Identity: ${mono("openai-wif-step1")} · ${mono("openai-wif-step2")}`],["key","Signs as the agent with KMS · no client secret"]],"agent")+
+    rail(3,"orange","door-open","AgentCore Gateway · who, which models",g.status==="READY"&&g.auth==="CUSTOM_JWT","ready","not deployed",[["shield",`Inbound ${mono(g.auth||"CUSTOM_JWT")} · Okta wif-gateway`],["scale",`Cedar ${mono(g.policy||"ENFORCE")}: your Okta group → its models`],["send",`Forwards one header, ${mono("X-Person-Token")} (no interceptor)`],["shuffle",`One target ${mono("openai")} → the translator (SigV4 + your token)`]],"gateway")+
+    rail(4,"emerald","fingerprint","IAM web identity · the Okta token is the AWS credential",!!s.webid?.gateway_provider,"configured","not configured",[["link",`IAM OIDC providers: Okta ${mono("wif-gateway")} + sign-in server`],["shield-check","Team role trust: the token's team tag must be that role's team"],["user-check","Session carries you: source identity + tags team, user"],["key-round","Translator and Direct agent need no AWS permission for it"]],"idc")+
+    rail(5,"teal","sparkles","OpenAI · trusts your AWS account",!!(g.teams&&Object.values(g.teams).every(t=>t.sa)),"linked","not linked",[["globe",`Identity provider = AWS issuer ${s.federation?"(on)":"(off)"}`],["split","Mappings: team role ARN → team service account"],["users",`engineering → ${mono(V.sa("engineering"))} · models ${mono("gpt-5.6-sol")}`],["users",`finance → ${mono(V.sa("finance"))} · models ${mono("gpt-5.6-terra")}`]],"openai");
+  const cmd=(t,c)=>`<div class="rounded-lg border border-zinc-200 bg-zinc-50 p-3"><div class="text-[11px] font-medium text-zinc-500">${t}</div><code class="mt-1 block break-all font-mono text-[12px] text-zinc-900">${c}</code></div>`;
+  $("#deploy-cmds").innerHTML=cmd("1 · Okta","python okta_agent_setup.py")+cmd("2 · Gateway + translators","python gateway/gateway_setup.py up")+cmd("3 · Okta tokens, Cedar","python gateway/gateway_obo.py up")+cmd("4 · IAM web identity (the person)","python webid_setup.py up")+cmd("5 · One translator","python gateway/translator_setup.py up")+cmd("6 · Agents on Runtime","python agent_deploy.py up · python agent_direct_deploy.py up")+cmd("7 · This console","./run.sh"); icons(); }
+
+// ---------------- 0 · token walkthrough: every token fully decoded, and where each claim comes from ----------------
+let CHAIN=null, CHAINCTX=null, MAPSTEP=0, CAPTURING=false, WALK_SEL=null, _walkStep=-1, WP="gw";
+const WS={gw:{},direct:{}};
+function useWalk(p){ if(!p||p===WP) return; WS[WP]={CHAIN,CHAINCTX,MAPSTEP,CAPTURING,WALK_SEL,_walkStep}; WP=p; const o=WS[p];
+  CHAIN=o.CHAIN===undefined?null:o.CHAIN; CHAINCTX=o.CHAINCTX||null; MAPSTEP=o.MAPSTEP||0; CAPTURING=!!o.CAPTURING; WALK_SEL=o.WALK_SEL||null; _walkStep=o._walkStep??-1; }
+const WID=x=>(WP==="direct"?"d":"")+x;
+async function loadChain(){ try{ const j=await (await fetch(`/api/chain?p=${WP==="direct"?"direct":"gw"}`)).json(); CHAIN=j.chain; CHAINCTX=j.ctx||{}; CHAINCTX.login=j.login; }catch(_){ CHAIN=null; } }
+const NSA="https://sts.amazonaws.com/", NSO="https://api.openai.com/auth", SEP="›";
+const tsKeys=["iat","exp","nbf","auth_time"];
+function jwtTok(id,title,by,d,note){ return d?{id,title,by,kind:"jwt",header:d.header||{},claims:d.claims||{},note}:{id,title,by,kind:"jwt",missing:true,note}; }
+function cardTok(id,title,by,claims,note){ return {id,title,by,kind:"card",claims,note}; }
+function rowsOf(t){ const rows=[]; if(t.kind==="jwt"&&!t.missing) Object.entries(t.header).forEach(([k,v])=>rows.push({p:"header"+SEP+k,k,v,hdr:1}));
+  Object.entries(t.claims||{}).forEach(([k,v])=>{ if(v&&typeof v==="object"&&!Array.isArray(v)){ rows.push({p:k,k,v:null,grp:1}); Object.entries(v).forEach(([k2,v2])=>rows.push({p:k+SEP+k2,k:k2,v:v2,sub:1})); } else rows.push({p:k,k,v}); }); return rows; }
+const fmtV=(k,v)=>v===null||v===undefined?"":typeof v==="number"&&tsKeys.includes(k)&&v>1e9?`${v}  (${new Date(v*1000).toLocaleTimeString()})`:typeof v==="string"?v:JSON.stringify(v);
+const PAL=["#2563eb","#059669","#d97706","#db2777","#7c3aed","#0891b2","#dc2626","#65a30d","#9333ea","#0d9488"];
+function jsonLines(t,rank){ // the token as real pretty-printed JSON, one entry per line, each attribute line tagged with its path
+  const L=[], q=x=>`<span class="text-zinc-400">"</span>${x}<span class="text-zinc-400">"</span>`, val=(k,v)=>{ if(typeof v==="string") return `<span class="text-emerald-800">${esc(JSON.stringify(v))}</span>`;
+    if(typeof v==="number"&&tsKeys.includes(k)&&v>1e9) return `<span class="text-blue-800">${v}</span><span class="text-zinc-400"> /* ${new Date(v*1000).toLocaleTimeString()} */</span>`;
+    return `<span class="text-blue-800">${esc(JSON.stringify(v))}</span>`; };
+  const rk=(path,v)=>!rank?0:v&&typeof v==="object"&&!Array.isArray(v)?Math.min(Infinity,...Object.keys(v).map(k=>rk(path+SEP+k,v[k]))):rank(path);
+  const obj=(o,ind,prefix,last)=>{ const ks=Object.keys(o).map((k,i)=>[k,i]).map(([k,i])=>[k,i,rk(prefix?prefix+SEP+k:k,o[k])]).sort((a,b)=>a[2]-b[2]||a[1]-b[1]).map(x=>x[0]); ks.forEach((k,n)=>{ const v=o[k], comma=n<ks.length-1?",":"", path=prefix?prefix+SEP+k:k;
+      if(v&&typeof v==="object"&&!Array.isArray(v)){ L.push({ind,p:null,h:`${q(`<span class="text-violet-700">${esc(k)}</span>`)}: {`}); obj(v,ind+1,path); L.push({ind,p:null,h:`}${comma}`}); }
+      else L.push({ind,p:path,k,h:`${q(`<span class="text-violet-700">${esc(k)}</span>`)}: ${val(k,v)}${comma}`}); }); };
+  L.push({ind:0,p:null,h:"{"});
+  if(t.kind==="jwt"){ L.push({ind:1,p:null,h:`${q('<span class="text-zinc-500">header</span>')}: {`}); obj(t.header,2,"header"); L.push({ind:1,p:null,h:"},"});
+    L.push({ind:1,p:null,h:`${q('<span class="text-zinc-500">payload</span>')}: {`}); obj(t.claims,2,""); L.push({ind:1,p:null,h:"}"}); }
+  else obj(t.claims||{},1,"");
+  L.push({ind:0,p:null,h:"}"}); return L; }
+function tokHtml(t,role,linked,rank){ const head=`<div class="flex items-center gap-2 border-b border-zinc-100 px-3 py-2"><i data-lucide="${t.kind==="jwt"?"file-key":"square-dashed"}" class="h-4 w-4 ${t.kind==="jwt"?"text-violet-600":"text-zinc-400"}"></i><span class="text-[13px] font-semibold text-zinc-900">${esc(t.title)}</span><span class="ml-auto text-[10.5px] text-zinc-400">${esc(t.by||"")}</span></div>`;
+  if(t.missing) return `<div class="rounded-xl border border-dashed border-zinc-300 bg-white">${head}<div class="p-3 text-[12px] text-zinc-400">Not captured in this run.</div></div>`;
+  const by=(t.by||"").replace(/^signed by /,"");
+  const body=jsonLines(t,rank).map(l=>{ const key=l.p!==null?`${t.id}|${l.p}`:null, C=key&&linked[key], isHdr=l.p&&l.p.startsWith("header"+SEP);
+    const note=role==="out"&&l.p!==null&&!C&&!isHdr?`<span class="text-zinc-300">  // set by ${esc(by)}</span>`:"";
+    return `<div ${key?`data-k="${esc(key)}"`:""} class="${C?"walk-linked cursor-pointer hover:brightness-95 ":""}whitespace-pre-wrap break-all font-mono text-[11px] leading-[18px] transition-opacity" style="padding:0 12px 0 ${12+l.ind*16}px;${C?`background:${C}1f;box-shadow:inset ${role==="in"?"-":""}3px 0 0 ${C};font-weight:600`:""}">${l.h}${note}</div>`; }).join("");
+  return `<div class="overflow-hidden rounded-xl border ${t.kind==="jwt"?"border-zinc-300":"border-dashed border-zinc-300"} bg-white shadow-sm">${head}<div class="bg-zinc-50/40 py-2">${body}</div>${t.note?`<div class="border-t border-zinc-100 px-3 py-1.5 text-[10.5px] text-zinc-400">${t.note}</div>`:""}</div>`; }
+function walkSteps(){ const C=CHAIN||{}, X=CHAINCTX||{}, L=C.login||X.login||{}, idc=C.id_token?.claims||{}, at=C.access_token?.claims||{}, gw=C.gateway_token?.claims||{}, jag=C.id_jag?.claims||{};
+  const aws=C.aws_jwt?.claims||{}, ns=aws[NSA]||{}, oai=C.openai_token?.claims||{}, oa=oai[NSO]||{}, team=gw.team||at["https://aws.amazon.com/tags/principal_tags/team"]||idc["https://aws.amazon.com/tags/principal_tags/team"]||"engineering", om=(X.openai||{}).teams?.[team]||{};
+  const model=(C.model?.model_id||"openai/gpt-5.6-sol").replace(/^openai\//,""), grp=(gw.groups||["wif-"+team])[0];
+  const SRCK="https://aws.amazon.com/source_identity", TAGK="https://aws.amazon.com/tags/principal_tags/", wi=C.web_identity||{}, roleArn=wi.role||aws.sub||V.teamRole(team);
+  const ca1=L.assertion, caRec=aud=>({header:{alg:"RS256",typ:"JWT",kid:X.kid},claims:{iss:X.agent,sub:X.agent,aud,iat:"(time of the call)",exp:"iat + 300",jti:"(random)"}});
+  const cred=cardTok("cred","Your sign-in credential","you, on Okta's page",{login:idc.preferred_username||STATUS.user?.login,password:"•••••••• (typed on Okta's own page; never seen by the console or the agent)","Okta user id":idc.sub,"Okta groups":gw.groups||["wif-"+team]});
+  const authz=cardTok("authz","Sign-in request","console → Okta /authorize",{...(L.authorize||{}),issuer:X.users_issuer});
+  const idT=jwtTok("id","id_token","signed by Okta (sign-in server)",C.id_token), atT=jwtTok("at","Access token · the Bearer the app sends to the agent","signed by Okta (sign-in server)",C.access_token);
+  const caT=jwtTok("ca","Client assertion · the agent's own signature","signed by the agent's KMS key",ca1,"private_key_jwt: Okta checks it with the agent's registered public key (JWK). Not a certificate; the private key never leaves KMS.");
+  const r1=C.step1_request||{}, r2=C.step2_request||{};
+  const GWS=[
+   {t:"You sign in: Okta returns the id_token and the Bearer for the agent",d:"You type your password on Okta's own page. The app's token request is authenticated by the agent's own KMS-signed JWT. One token response carries both: the id_token (who you are, issued to the agent) and the access token (the Bearer the app sends to the agent).",
+    how:`GET ${X.users_issuer||"…"}/v1/authorize  →  POST ${L.token_endpoint||"…/v1/token"}  (authorization_code + PKCE + client_assertion)`,
+    ins:[cred,authz,caT],outs:[idT,atT],links:[
+      ["cred","Okta user id","id","sub"],["cred","login","id","preferred_username"],["cred","login","id","email"],["cred","login","id","https://aws.amazon.com/source_identity"],
+      ["cred","Okta groups","id","groups"],["cred","Okta groups","id","https://aws.amazon.com/tags/principal_tags/team","team = expression on the wif-* group"],
+      ["authz","client_id","id","aud"],["authz","issuer","id","iss"],
+      ["cred","Okta user id","at","uid"],["cred","login","at","sub"],["authz","issuer","at","iss"],["authz","scope","at","scp"],["ca","iss","at","cid"],["ca","sub","at","act"+SEP+"sub"],
+      ["cred","login","at",SRCK],["cred","login","at",TAGK+"user"],["cred","Okta groups","at",TAGK+"team"]]},
+   {t:"The app sends the Bearer to the agent",d:"Authorization: Bearer <access token>, with the id_token in the body. AgentCore Runtime checks the Bearer before any agent code runs; the agent then checks the id_token is the caller's own.",how:"POST /runtimes/openai_wif_agent/invocations  Authorization: Bearer <access token>  body: {prompt, id_token}",
+    ins:[atT,idT],out:cardTok("rt","Checks that pass","AgentCore Runtime + the agent",{"iss = discovery issuer":at.iss,"aud allowed":at.aud,"scope required":X.invoke_scope,"cid = the agent":at.cid,"id_token.sub = access uid":`${idc.sub} = ${at.uid}`,"id_token.aud = the agent":idc.aud}),
+    links:[["at","iss","rt","iss = discovery issuer"],["at","aud","rt","aud allowed"],["at","scp","rt","scope required"],["at","cid","rt","cid = the agent"],["at","uid","rt","id_token.sub = access uid"],["id","sub","rt","id_token.sub = access uid"],["id","aud","rt","id_token.aud = the agent"]]},
+   {t:"Agent → Okta: id_token → ID-JAG",d:"AgentCore Identity (@requires_access_token) sends your id_token to Okta and authenticates as the agent with its own KMS-signed JWT. Okta returns an Identity Assertion JWT: you, with the agent as the actor.",how:`POST ${X.org_token_endpoint||"…"}  grant_type=token-exchange`,
+    ins:[idT,jwtTok("ca2","Client assertion (by AgentCore Identity)","signed by the agent's KMS key",caRec(X.org_token_endpoint),"Built and KMS-signed inside AgentCore Identity, so it isn't exposed; this is its shape with this deployment's values."),
+         cardTok("rq1","Token-exchange request","AgentCore Identity → Okta",{grant_type:"urn:ietf:params:oauth:grant-type:token-exchange",subject_token:"<the id_token>",...(r1.customParameters||{}),scope:(r1.scopes||[X.gateway_scope]).join(" "),client_id:X.agent})],
+    out:jwtTok("jag","ID-JAG","signed by Okta (org server)",C.id_jag),links:[["id","sub","jag","sub"],["ca2","iss","jag","client_id"],["ca2","sub","jag","act"+SEP+"sub"],["rq1","audience","jag","aud"],["rq1","scope","jag","scope"]]},
+   {t:"Agent → Okta wif-gateway: ID-JAG → Gateway token",d:"The ID-JAG goes to the Gateway's authorization server (jwt-bearer grant), again with the agent's signed JWT. Okta adds your group membership from its directory.",how:`POST ${X.gateway_token_endpoint||"…"}  grant_type=jwt-bearer`,
+    ins:[jwtTok("jag","ID-JAG","signed by Okta (org server)",C.id_jag),jwtTok("ca3","Client assertion (by AgentCore Identity)","signed by the agent's KMS key",caRec(X.gateway_token_endpoint),"Built inside AgentCore Identity; shape shown."),
+         cardTok("dir","From Okta's directory + server config","Okta",{login:gw.sub,groups:gw.groups,"team (expression on the wif-* group)":gw.team,"audience (server config)":X.gateway_audience,issuer:X.gateway_issuer,scope:X.gateway_scope})],
+    out:jwtTok("gw","Gateway token · the Bearer the agent sends to the Gateway","signed by Okta (wif-gateway)",C.gateway_token),
+    links:[["jag","sub","gw","uid"],["dir","login","gw","sub"],["jag","act"+SEP+"sub","gw","act"+SEP+"sub"],["ca3","iss","gw","cid"],["dir","groups","gw","groups"],["dir","team (expression on the wif-* group)","gw","team"],["dir","audience (server config)","gw","aud"],["dir","issuer","gw","iss"],["dir","scope","gw","scp"],["dir","login","gw","login"],
+      ["dir","login","gw",SRCK],["dir","login","gw",TAGK+"user"],["dir","team (expression on the wif-* group)","gw",TAGK+"team"]]},
+   {t:"AgentCore Gateway: Cedar reads the token",d:"The agent sends the Gateway token as Bearer and as X-Person-Token. The Gateway validates it, and Cedar checks the agent, the person's groups and the requested model.",how:`POST /inference/v1/chat/completions  model=openai/${model}`,
+    ins:[jwtTok("gw","Gateway token · the Bearer the agent sends to the Gateway","signed by Okta (wif-gateway)",C.gateway_token)],
+    out:cardTok("cedar","Cedar decision · permit","AgentCore Gateway",{"cid = the agent":gw.cid,"act like the agent":gw.act?.sub,"groups contain":grp,"requested model":model,"allowed for the group":(X.group_models||{})[grp],"then":`SigV4 as ${(C.call?.sigv4_caller||"OpenAIWifGatewayServiceRole").split("/").slice(-2,-1)[0]||"the Gateway role"} + X-Person-Token → translator`}),
+    links:[["gw","cid","cedar","cid = the agent"],["gw","act"+SEP+"sub","cedar","act like the agent"],["gw","groups","cedar","groups contain"]]},
+   {t:"Translator → STS: your Gateway token is the AWS credential (web identity)",d:"The translator hands your Gateway token to STS. An IAM OIDC provider trusts Okta's wif-gateway server, and the team role's trust policy is the mapping: it admits the token only if its team tag is that role's team. No lookup code, and the translator needs no AWS permission for this.",how:"sts:AssumeRoleWithWebIdentity  RoleArn=<role for the token's team tag>  WebIdentityToken=<Gateway token>",
+    ins:[jwtTok("gw","Gateway token · the Bearer the agent sends to the Gateway","signed by Okta (wif-gateway)",C.gateway_token),
+         cardTok("trust","Team role trust policy · the mapping","IAM",{role:roleArn,"Principal (IAM OIDC provider)":(X.webid||{}).gateway_provider,"<provider>:aud":X.gateway_audience,"aws:RequestTag/team":team,"aws:TagKeys (only)":["team","user"],"sts:SetSourceIdentity":"required"}),
+         cardTok("rq","AssumeRoleWithWebIdentity request","translator",{RoleArn:roleArn,RoleSessionName:(wi.session||"").split("/").pop()||"person-<login>",WebIdentityToken:"<the Gateway token>",DurationSeconds:3600})],
+    out:cardTok("sess","Your session of the team role","AWS STS",{AssumedRoleUser:wi.session,SourceIdentity:wi.source_identity,SubjectFromWebIdentityToken:wi.subject,Provider:wi.provider,Audience:wi.audience,"session tags":wi.session_tags||{}}),
+    links:[["gw",SRCK,"sess","SourceIdentity"],["gw","sub","sess","SubjectFromWebIdentityToken"],["gw",TAGK+"team","sess","session tags"+SEP+"team"],["gw",TAGK+"user","sess","session tags"+SEP+"user"],
+      ["gw","aud","sess","Audience"],["gw","iss","sess","Provider","issuer = the IAM OIDC provider"],["trust","role","sess","AssumedRoleUser","admitted: team tag = this role's team"]]},
+   {t:"Translator → STS: your session → AWS JWT",d:"As your session, the translator asks STS for a JWT for OpenAI. STS signs it: sub = the team role (what OpenAI maps), source_identity and principal_tags.user = you, federated_provider = Okta's IAM OIDC provider.",how:"sts:GetWebIdentityToken  Audience=https://api.openai.com/v1  SigningAlgorithm=ES384  DurationSeconds=900",
+    ins:[cardTok("sess","Your session of the team role","AWS STS",{AssumedRoleUser:wi.session,SourceIdentity:wi.source_identity,SubjectFromWebIdentityToken:wi.subject,Provider:wi.provider,Audience:wi.audience,"session tags":wi.session_tags||{}}),cardTok("req","GetWebIdentityToken request","translator, as your session",{Audience:aws.aud,SigningAlgorithm:"ES384",DurationSeconds:900,"role's IAM tags":{project:(ns.principal_tags||{}).project}})],
+    out:jwtTok("aws","AWS JWT","signed by AWS STS",C.aws_jwt),
+    links:[["sess","SourceIdentity","aws",NSA+SEP+"source_identity"],["sess","session tags"+SEP+"team","aws",NSA+SEP+"principal_tags"+SEP+"team"],["sess","session tags"+SEP+"user","aws",NSA+SEP+"principal_tags"+SEP+"user"],
+      ["sess","Provider","aws",NSA+SEP+"federated_provider"],["sess","AssumedRoleUser","aws","sub","the role, not the session"],["sess","AssumedRoleUser","aws",NSA+SEP+"principal_id"],["req","Audience","aws","aud"],["req","role's IAM tags"+SEP+"project","aws",NSA+SEP+"principal_tags"+SEP+"project"]]},
+   {t:"Translator → OpenAI: AWS JWT → OpenAI token",d:"OpenAI's workload identity provider trusts your AWS issuer. The mapping matches the JWT's sub (the team role) to the team's service account. Your user ID is not carried over.",how:"POST https://auth.openai.com/oauth/token  grant_type=token-exchange",
+    ins:[jwtTok("aws","AWS JWT","signed by AWS STS",C.aws_jwt),cardTok("map","Exchange request + mapping","OpenAI",{identity_provider_id:(X.openai||{}).identity_provider_id,service_account_id:om.service_account_id,mapping:`${om.mapping_name||""} · ${om.mapping_id||""}`,"mapping rule":`sub == ${aws.sub||"<team role>"}`})],
+    out:jwtTok("oai",(WP==="direct"?"OpenAI token · the Bearer the agent sends to OpenAI":"OpenAI token · the Bearer the translator sends to OpenAI"),"signed by OpenAI",C.openai_token),
+    links:[["aws","sub","oai",NSO+SEP+"wif_external_subject"],["aws","iss","oai",NSO+SEP+"wif_external_issuer"],["map","identity_provider_id","oai",NSO+SEP+"wif_identity_provider_id"],["map","service_account_id","oai","sub"],["map","service_account_id","oai",NSO+SEP+"wif_service_account_id"],["map","mapping","oai",NSO+SEP+"wif_federation_rule_id"],["aws","exp","oai","exp","never outlives the AWS JWT"]]},
+   {t:"The model call",d:"The translator calls OpenAI with the OpenAI token as Bearer. OpenAI checks the project's model limit and answers as the team's service account.",how:`POST https://api.openai.com/v1/chat/completions  Authorization: Bearer <OpenAI token>`,
+    ins:[jwtTok("oai",(WP==="direct"?"OpenAI token · the Bearer the agent sends to OpenAI":"OpenAI token · the Bearer the translator sends to OpenAI"),"signed by OpenAI",C.openai_token)],
+    out:cardTok("call","OpenAI processes the call as","OpenAI",{service_account:oai.sub,project:oa.project_id,organization:oa.organization_id,model,"project model limit":(om.project_models||[]).join(", ")||"(set in the OpenAI dashboard)",answer:C.model?.error?"refused":"answered"}),
+    links:[["oai","sub","call","service_account"],["oai",NSO+SEP+"project_id","call","project"],["oai",NSO+SEP+"organization_id","call","organization"]]}];
+  if(WP!=="direct") return GWS;
+  const sessD=cardTok("sess","Your session of the team role","AWS STS",{AssumedRoleUser:wi.session,SourceIdentity:wi.source_identity,SubjectFromWebIdentityToken:wi.subject,Provider:wi.provider,Audience:wi.audience,"session tags":wi.session_tags||{}});
+  return [GWS[0],
+   {t:"The app sends the Bearer to the Direct agent",d:"Authorization: Bearer <access token>. AgentCore Runtime checks it before any agent code runs. In the Direct pattern this same token is also your AWS credential.",how:"POST /runtimes/openai_wif_direct_agent/invocations  Authorization: Bearer <access token>  body: {prompt}",
+    ins:[atT],out:cardTok("rt","Checks that pass","AgentCore Runtime",{"iss = discovery issuer":at.iss,"aud allowed":at.aud,"scope required":X.invoke_scope,"cid = the agent":at.cid}),
+    links:[["at","iss","rt","iss = discovery issuer"],["at","aud","rt","aud allowed"],["at","scp","rt","scope required"],["at","cid","rt","cid = the agent"]]},
+   {t:"Direct agent → STS: your access token is the AWS credential (web identity)",d:"The agent hands your access token to STS. An IAM OIDC provider trusts Okta's sign-in server, and the team role's trust policy is the mapping: it admits the token only if its team tag is that role's team. The agent's own role needs no permission for this.",how:"sts:AssumeRoleWithWebIdentity  RoleArn=<role for the token's team tag>  WebIdentityToken=<access token>",
+    ins:[atT,cardTok("trust","Team role trust policy · the mapping","IAM",{role:roleArn,"Principal (IAM OIDC provider)":(X.webid||{}).signin_provider,"<provider>:aud":"openai-wif-demo","aws:RequestTag/team":team,"aws:TagKeys (only)":["team","user"],"sts:SetSourceIdentity":"required"}),
+         cardTok("rq","AssumeRoleWithWebIdentity request","the Direct agent",{RoleArn:roleArn,RoleSessionName:(wi.session||"").split("/").pop()||"person-<login>",WebIdentityToken:"<your access token>",DurationSeconds:3600})],
+    out:sessD,
+    links:[["at",SRCK,"sess","SourceIdentity"],["at","sub","sess","SubjectFromWebIdentityToken"],["at",TAGK+"team","sess","session tags"+SEP+"team"],["at",TAGK+"user","sess","session tags"+SEP+"user"],
+      ["at","aud","sess","Audience"],["at","iss","sess","Provider","issuer = the IAM OIDC provider"],["trust","role","sess","AssumedRoleUser","admitted: team tag = this role's team"]]},
+   {...GWS[6],t:"The OpenAI SDK → STS: your session → AWS JWT",d:"The OpenAI SDK's token function (bound to your session) asks STS for a JWT for OpenAI: sub = the team role, source_identity and principal_tags.user = you.",
+    ins:[sessD,cardTok("req","GetWebIdentityToken request","the OpenAI SDK, as your session",{Audience:aws.aud,SigningAlgorithm:"ES384",DurationSeconds:900,"role's IAM tags":{project:(ns.principal_tags||{}).project}})]},
+   {...GWS[7],t:"The OpenAI SDK → OpenAI: AWS JWT → OpenAI token",d:"The SDK exchanges the AWS JWT (workload_identity), caches the short-lived OpenAI token and refreshes it before it expires. The mapping picks the team's service account."},
+   {...GWS[8],d:"The agent calls OpenAI directly with the OpenAI token as Bearer: no Gateway, no Cedar. OpenAI checks the project's model limit."}]; }
+function drawWalkArrows(){ const box=$("#"+WID("walk-box")), svg=$("#"+WID("walk-svg")); if(!box||!svg) return; const S=walkSteps()[MAPSTEP], b=box.getBoundingClientRect(); let s="";
+  const act=walkActive(S), on=new Set();
+  S.links.forEach((l,i)=>{ const a=box.querySelector(`[data-k="${CSS.escape(l[0]+"|"+l[1])}"]`), z=box.querySelector(`[data-k="${CSS.escape(l[2]+"|"+l[3])}"]`); if(!a||!z) return;
+    const ra=a.getBoundingClientRect(), rz=z.getBoundingClientRect(), x1=ra.right-b.left, y1=ra.top+ra.height/2-b.top, x2=rz.left-b.left, y2=rz.top+rz.height/2-b.top, c=PAL[i%PAL.length], mx=(x1+x2)/2;
+    const sel=act?act.has(i):null; if(sel){ on.add(l[0]+"|"+l[1]); on.add(l[2]+"|"+l[3]); }
+    const op=sel===null?.85:sel?1:.1, sw=sel?3.2:1.6, lab=l[4]&&sel!==false;
+    s+=`<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2-6},${y2}" fill="none" stroke="${c}" stroke-width="${sw}" opacity="${op}"/><polygon points="${x2},${y2} ${x2-8},${y2-5} ${x2-8},${y2+5}" fill="${c}" opacity="${op}"/>${lab?`<text x="${mx}" y="${(y1+y2)/2-4}" text-anchor="middle" style="font-size:9.5px;fill:${c};paint-order:stroke;stroke:#fff;stroke-width:3px">${esc(l[4])}</text>`:""}`; });
+  svg.setAttribute("width",b.width); svg.setAttribute("height",b.height); svg.innerHTML=s;
+  box.querySelectorAll("[data-k].walk-linked").forEach(el=>{ const k=el.getAttribute("data-k"), hit=on.has(k);
+    el.style.opacity=act&&!hit?".35":""; el.style.outline=hit?"2px solid rgba(37,99,235,.55)":""; el.style.outlineOffset=hit?"-2px":""; }); }
+function walkActive(S){ if(!WALK_SEL) return null; const a=new Set(); S.links.forEach((l,i)=>{ if(l[0]+"|"+l[1]===WALK_SEL||l[2]+"|"+l[3]===WALK_SEL) a.add(i); }); return a.size?a:null; }
+document.addEventListener("click",e=>{ if(!walkOn()) return; useWalk(view==="darch"?"direct":"gw"); const box=e.target.closest("#"+WID("walk-box")); if(!box) return;
+  const row=e.target.closest("[data-k].walk-linked"), k=row&&row.getAttribute("data-k"); WALK_SEL=k&&k!==WALK_SEL?k:null; drawWalkArrows(); });
+async function captureChain(){ if(BUSY||!STATUS.user) return; const p=WP; CAPTURING=true; renderMap();
+  stream(p==="direct"?"direct":"chat",{prompt:"Say hello in five words.",model:V.allowed()[0]},ev=>{ if(ev.kind==="done") enq(async()=>{ BUSY=false; useWalk(p); CAPTURING=false; await loadChain(); MAPSTEP=0; renderMap(); },10); }); }
+async function renderMap(p){ useWalk(p); if(CHAIN===null&&!CAPTURING) await loadChain(); if(_walkStep!==MAPSTEP){ WALK_SEL=null; _walkStep=MAPSTEP; } const steps=walkSteps(), n=steps.length; MAPSTEP=Math.max(0,Math.min(n-1,MAPSTEP)); const S=steps[MAPSTEP];
+  const linked={}; S.links.forEach((l,i)=>{ const c=PAL[i%PAL.length]; linked[l[0]+"|"+l[1]]=linked[l[0]+"|"+l[1]]||c; linked[l[2]+"|"+l[3]]=linked[l[2]+"|"+l[3]]||c; });
+  // order claims to minimise crossing arrows: inputs put what flows onward first; the output follows its sources' order
+  const inRank=t=>p=>p.startsWith("header"+SEP)?-1:linked[t.id+"|"+p]?0:1, inPos={};
+  S.ins.forEach((t,ti)=>{ if(!t.missing) jsonLines(t,inRank(t)).forEach((l,li)=>{ if(l.p!==null) inPos[t.id+"|"+l.p]=ti*10000+li; }); });
+  const OUTS=S.outs||[S.out];
+  const outRank=t=>p=>{ if(p.startsWith("header"+SEP)) return -1; const src=S.links.filter(l=>l[2]===t.id&&l[3]===p).map(l=>inPos[l[0]+"|"+l[1]]).filter(x=>x!==undefined); return src.length?Math.min(...src):1e9; };
+  const dots=steps.map((x,i)=>`<button onclick="MAPSTEP=${i};renderMap()" title="${esc(x.t)}" class="h-2.5 w-2.5 rounded-full ${i===MAPSTEP?"bg-blue-600":i<MAPSTEP?"bg-zinc-400":"bg-zinc-200"}"></button>`).join("");
+  const cap=CHAIN?`captured ${new Date(CHAIN.at*1000).toLocaleTimeString()} · real tokens, decoded (signatures not shown)`:"no run captured yet";
+  $("#"+WID("map")).innerHTML=`<div class="flex items-end justify-between gap-6"><div class="min-w-0 flex-1"><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">Part 2 · how identity propagates · ${WP==="direct"?"direct, no Gateway":"through the Gateway"} · step ${MAPSTEP+1} of ${n}</div>
+      <h2 class="text-lg font-semibold tracking-tight text-zinc-900">${esc(S.t)}</h2><p class="mt-1 max-w-4xl text-sm text-zinc-500">${esc(S.d)}</p>
+      <div class="mt-1 break-all font-mono text-[11px] text-zinc-400">${esc(S.how)}</div></div>
+    <div class="flex shrink-0 flex-col items-end gap-2"><div class="flex items-center gap-2"><button onclick="captureChain()" ${!STATUS.user||BUSY?"disabled":""} class="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"><i data-lucide="${CAPTURING?"loader":"camera"}" class="h-4 w-4 ${CAPTURING?"animate-spin":""}"></i>${CAPTURING?"Capturing…":"Capture a fresh chain"}</button>
+      <button onclick="MAPSTEP--;renderMap()" ${MAPSTEP===0?"disabled":""} class="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"><i data-lucide="chevron-left" class="h-4 w-4"></i> Prev</button>
+      <button onclick="MAPSTEP++;renderMap()" ${MAPSTEP===n-1?"disabled":""} class="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40">Next <i data-lucide="chevron-right" class="h-4 w-4"></i></button></div>
+      <div class="flex items-center gap-1.5">${dots}</div><div class="text-[10.5px] text-zinc-400">${cap}</div></div></div>
+    ${CHAIN?"":`<div class="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-900/80">${STATUS.user?"Click <b>Capture a fresh chain</b>: it asks the agent one question as you and records every token on the way.":"Sign in with Okta first (top right), then capture a chain."}</div>`}
+    <div id="${WID("walk-box")}" class="relative mt-4 grid grid-cols-[minmax(0,1fr)_150px_minmax(0,1fr)] items-start">
+      <div class="space-y-3">${S.ins.map(t=>tokHtml(t,"in",linked,inRank(t))).join("")}</div><div></div><div class="space-y-3">${OUTS.map(t=>tokHtml(t,"out",linked,outRank(t))).join("")}</div>
+      <svg id="${WID("walk-svg")}" class="pointer-events-none absolute left-0 top-0"></svg></div>
+    <div class="mt-2 text-[11px] text-zinc-400">← / → keys step through · each arrow: an attribute of the incoming JSON → the attribute it becomes in the new token · click a highlighted attribute to trace it · "// set by …" = added by the issuer itself · signatures not shown</div>`;
+  icons(); requestAnimationFrame(drawWalkArrows); }
+const walkOn=()=>(view==="arch"&&ARCHTAB==="p2")||(view==="darch"&&DARCHTAB==="p2");
+addEventListener("resize",()=>{ if(walkOn()){ useWalk(view==="darch"?"direct":"gw"); drawWalkArrows(); } });
+document.addEventListener("keydown",e=>{ if(!walkOn()||e.target.closest("textarea,input")) return; useWalk(view==="darch"?"direct":"gw"); if(e.key==="ArrowRight"){ MAPSTEP++; renderMap(); } if(e.key==="ArrowLeft"){ MAPSTEP--; renderMap(); } });
+
+// ---------------- UML ----------------
+const TONES={zinc:["#f4f4f5","#a1a1aa","#18181b"],violet:["#f5f3ff","#c4b5fd","#5b21b6"],blue:["#eff6ff","#93c5fd","#1d4ed8"],indigo:["#eef2ff","#a5b4fc","#4338ca"],orange:["#fff7ed","#fdba74","#c2410c"],amber:["#fffbeb","#fcd34d","#b45309"],teal:["#f0fdfa","#5eead4","#0f766e"],emerald:["#ecfdf5","#6ee7b7","#047857"]};
+const PARTS=[["you","You","browser","zinc"],["con","Console","localhost:8090","zinc"],["okta","Okta","agent app · wif-gateway","violet"],["agent","Agent","AgentCore Runtime","blue"],
+  ["idn","AgentCore Identity","KMS-signed","indigo"],["gw","AgentCore Gateway","Okta JWT · Cedar","orange"],["tr","Translator","you → OpenAI token","amber"],["idc","AWS STS","web identity · your session","emerald"],["oai","OpenAI","exchange · model","teal"]];
+const UML={
+ chain:{title:"The chain · one question from Ada to OpenAI",sub:"Ada signs in to the agent's Okta app. The agent gets a delegated token for her through AgentCore Identity, calls the Gateway, and the Gateway reaches OpenAI with IAM. The translator hands Ada's token to STS as her web identity: IAM admits it only into her team's role, and the session carries her.",steps:[
+  {f:"you",t:"con",l:"Sign in with Okta",d:"Grace would land on Finance through exactly the same steps."},
+  {f:"con",t:"okta",l:"authorize · the agent's own app",d:"Code + PKCE. The token request authenticates <b>as the agent</b> with a client assertion signed by its KMS key: no client secret exists.",p:()=>`GET ${V.usersIss()}/v1/authorize
+  client_id=${V.agent()}  scope=openid profile email openai-agent.invoke
+POST …/v1/token  client_assertion=<JWT signed by KMS key wif-openai-agent-kms>`},
+  {f:"okta",t:"con",r:1,l:"id_token + access token",d:"The id_token's aud is the agent. The access token's cid is the agent too: that's what the Runtime admits.",p:()=>`id_token     { sub: "00u…", aud: "${V.agent()}", preferred_username: "${V.user()}" }
+access token { aud: "openai-wif-demo", cid: "${V.agent()}", scp: [… "openai-agent.invoke"] }`},
+  {f:"con",t:"agent",l:"invoke · Bearer access token",d:"AgentCore Runtime validates the Okta JWT (CUSTOM_JWT: issuer, audience, scope, cid = the agent).",p:()=>`POST /runtimes/<openai_wif_agent>/invocations
+Authorization: Bearer <access token>
+{ "prompt": "What is 17 × 23?", "id_token": "<id_token>" }`},
+  {f:"agent",t:"agent",l:"is this id_token the caller's?",d:"Same person (sub = uid) and issued to this agent (aud). Otherwise the agent refuses to act."},
+  {f:"agent",t:"idn",l:"@requires_access_token · step 1",d:"The id_token becomes the subject (GetWorkloadAccessTokenForJWT), then the decorator calls GetResourceOauth2Token.",p:()=>`provider          openai-wif-step1 · ON_BEHALF_OF_TOKEN_EXCHANGE
+customParameters  subject_token_type=id_token  requested_token_type=id-jag
+                  audience=${V.gwIss()}`},
+  {f:"idn",t:"okta",l:"token exchange → ID-JAG",d:"AgentCore Identity signs the client assertion with the agent's KMS key."},
+  {f:"okta",t:"idn",r:1,l:"ID-JAG · sub = Ada · act = agent",d:"Okta's Identity Assertion JWT: the user, and the agent acting for them."},
+  {f:"idn",t:"okta",l:"step 2 · jwt-bearer → wif-gateway",d:"Okta checks the agent's connection (scope inference:invoke) and Ada's team group."},
+  {f:"okta",t:"agent",r:1,l:"Gateway token",d:"The delegated token the Gateway trusts.",p:()=>`{ iss: "${V.gwIss()}", aud: "openai-wif-gateway",
+  sub: "${V.user()}", act: { sub: "${V.agent()}" }, cid: "${V.agent()}",
+  team: "${V.team()}", scp: ["inference:invoke"] }`},
+  {f:"agent",t:"gw",l:"chat/completions · Bearer Gateway token",d:"Strands' OpenAI model, pointed at the Gateway. One target, openai; you pick the model and Cedar checks your group may use it.",p:()=>`POST ${V.gwUrl()}/v1/chat/completions
+Authorization: Bearer <Gateway token>
+X-Person-Token: <the same Gateway token>
+{ "model": "openai/gpt-4.1-mini", "stream": true, … }`},
+  {f:"gw",t:"gw",l:"JWT · Cedar",d:"Validates the Okta token; Cedar checks cid + act, and that your <code>groups</code> claim allows the requested model. The target allowlists exactly one header, <code>X-Person-Token</code> (header propagation, no interceptor)."},
+  {f:"gw",t:"tr",l:"SigV4 + X-Person-Token",d:"Inference provider target → the one translator (Lambda Function URL, IAM only), on the team's path. No key in the Gateway.",p:()=>`POST <translator>/${V.team()}/v1/chat/completions
+Authorization: AWS4-HMAC-SHA256 … (OpenAIWifGatewayServiceRole)
+X-Person-Token: <the delegated Gateway token: sub = ${V.user()}>`},
+  {f:"tr",t:"idc",l:"AssumeRoleWithWebIdentity · Ada's token",d:"The Gateway token is the credential: an IAM OIDC provider trusts Okta wif-gateway. The team role's trust policy admits it only if its team tag is that role's team. The translator needs no AWS permission for this.",p:()=>`sts:AssumeRoleWithWebIdentity
+  RoleArn          = ${V.teamRole()}      // picked from the token's team tag; IAM refuses any other
+  WebIdentityToken = <Gateway token>
+  trust: <okta provider>:aud = openai-wif-gateway · aws:RequestTag/team = "${V.team()}"`},
+  {f:"idc",t:"tr",r:1,l:"Ada's session of the team role",d:"Source identity = her login, kept for the whole session; session tags team + user from the token.",p:()=>`AssumedRoleUser  …/OpenAIWifGateway${cap(V.team())}Role/person-${V.user()}
+SourceIdentity   ${V.user()}
+session tags     team = ${V.team()} · user = ${V.user()}`},
+  {f:"tr",t:"idc",l:"GetWebIdentityToken · as her session",d:"STS signs a JWT for OpenAI: sub = the team role (what OpenAI maps), source_identity + principal_tags.user = Ada.",p:()=>`sts:GetWebIdentityToken  aud=https://api.openai.com/v1  (15 min)
+→ { sub: "…/OpenAIWifGateway${cap(V.team())}Role",
+    "https://sts.amazonaws.com/": { source_identity: "${V.user()}", principal_tags: { team: "${V.team()}", user: "${V.user()}" } } }`},
+  {f:"tr",t:"oai",l:"token exchange → OpenAI token",d:"OpenAI maps the team role to the team's service account. Its token names that service account, not Ada; the translator caches it per person, in memory.",p:()=>`POST https://auth.openai.com/oauth/token  grant_type=token-exchange
+  subject_token=<AWS JWT>  service_account_id=${V.sa(V.team())}`},
+  {f:"tr",t:"oai",l:"model call · short-lived Bearer",d:"Ada's OpenAI token, valid for minutes; it never outlives the AWS JWT."},
+  {f:"oai",t:"gw",r:1,l:"streamed answer",d:"Straight back through the Gateway. CloudTrail and the translator log now hold the evidence that this token was minted for Ada."},
+  {f:"gw",t:"con",r:1,l:"answer (via the agent)",d:"The agent may call local tools (calculator, current_time) and the model again, all as Ada."}]},
+ direct:{title:"Direct · the agent calls OpenAI as you",sub:"No Gateway. The agent hands your Okta token to STS as your web identity: IAM admits it only into your team's role, and the OpenAI SDK swaps that session for a short-lived OpenAI token. The agent's own role never gets one.",
+  parts:[["you","You","browser","zinc"],["con","Console","localhost:8090","zinc"],["agent","Direct agent","AgentCore Runtime","blue"],["sts","AWS STS","web identity · us-east-1","orange"],["sdk","OpenAI SDK","workload_identity","indigo"],["oai","OpenAI","exchange · model","teal"]],
+  steps:[
+  {f:"you",t:"con",l:"Sign in with Okta",d:"The same sign-in as the Gateway pattern."},
+  {f:"con",t:"agent",l:"invoke · Bearer access token",d:"AgentCore Runtime validates the Okta JWT (cid = the agent). The agent then uses the same token as your AWS credential."},
+  {f:"agent",t:"sts",l:"AssumeRoleWithWebIdentity · your Okta token",d:"An IAM OIDC provider trusts Okta's sign-in server. The team role's trust admits your token only if its team tag is that role's team. The agent's role needs no permission for this and can't mint OpenAI tokens itself.",p:()=>`sts:AssumeRoleWithWebIdentity
+  RoleArn          = ${V.teamRole()}
+  WebIdentityToken = <your access token>
+  trust: <okta provider>:aud = openai-wif-demo · aws:RequestTag/team = "${V.team()}"`},
+  {f:"sts",t:"agent",r:1,l:"your session of the team role",d:"Source identity = your login; session tags team + user.",p:()=>`AssumedRoleUser  …/OpenAIWifGateway${cap(V.team())}Role/person-${V.user()}
+SourceIdentity   ${V.user()}`},
+  {f:"agent",t:"sdk",l:"Strands → OpenAIModel(client) · yours",d:"One AsyncOpenAI client per person, with workload_identity: a token function bound to your session + your team's service account.",p:()=>`client = AsyncOpenAI(workload_identity={
+  "identity_provider_id": "${esc(mask((STATUS.openai_map||{}).identity_provider_id||"idp_<your-provider-id>",8,4))}",
+  "service_account_id":   "${V.sa(V.team())}",
+  "provider": {"token_type": "jwt", "get_token": aws_token}})   # aws_token = your session
+OpenAIModel(client=client, model_id="${V.allowed()[0]}")`},
+  {f:"sdk",t:"sts",l:"aws_token() · GetWebIdentityToken",d:"As your session of the team role. IAM: only OpenAI's audience, at most 1 hour (the demo asks for 15 min).",p:()=>`Audience=["https://api.openai.com/v1"]  SigningAlgorithm=ES384  DurationSeconds=900`},
+  {f:"sts",t:"sdk",r:1,l:"AWS JWT · team role + you",d:"sub = the team role (what OpenAI maps), source_identity + principal_tags.user = you.",p:()=>`{ "sub": "${V.teamRole()}",
+  "https://sts.amazonaws.com/": { "source_identity": "${V.user()}", "principal_tags": { "team": "${V.team()}", "user": "${V.user()}" }, … } }`},
+  {f:"sdk",t:"oai",l:"token exchange",d:"POST auth.openai.com/oauth/token; OpenAI maps the team role to the team's service account."},
+  {f:"oai",t:"sdk",r:1,l:"OpenAI token · cached",d:"The SDK caches it and refreshes before expiry: one AWS token served several model calls in testing."},
+  {f:"sdk",t:"oai",l:"chat/completions · Bearer",d:"Straight to api.openai.com: no Cedar, no Gateway in between."},
+  {f:"oai",t:"agent",r:1,l:"answer",d:"Tools (calculator, current_time) run locally in the agent."}]},
+ guards:{title:"Guardrails · each hop refuses what it shouldn't trust",sub:"Four tries that must fail.",steps:[
+  {frag:"forged Okta token",f:"con",t:"agent",l:"invoke · edited token",d:"Signature changed, as an attacker editing claims would."},
+  {frag:"forged Okta token",f:"agent",t:"con",r:1,bad:1,l:"401 · Runtime rejects",d:"AgentCore Runtime verifies Okta's signature before any code runs."},
+  {frag:"someone else's id_token",f:"agent",t:"agent",bad:1,l:"agent refuses",d:"id_token sub ≠ the caller's uid: the agent won't act for someone who didn't call it."},
+  {frag:"your own token, no agent",f:"con",t:"gw",l:"call the Gateway directly",d:"Ada's sign-in token, not delegated (wrong issuer and audience, no act)."},
+  {frag:"your own token, no agent",f:"gw",t:"con",r:1,bad:1,l:"403 · insufficient_scope",d:"Not a Gateway token: the sign-in token lacks the Gateway's issuer, audience and scope (inference:invoke). Only Okta wif-gateway tokens issued to the agent get in."},
+  {frag:"a model your group can't use",f:"agent",t:"gw",l:"model openai/gpt-4o-mini (Ada)",d:"A genuine delegated token for Ada (groups = wif-engineering), asking for a model only wif-finance may use."},
+  {frag:"a model your group can't use",f:"gw",t:"agent",r:1,bad:1,l:"403 · Cedar default deny",d:"No permit matches: wif-engineering's rule allows gpt-4.1-mini and gpt-4.1 only."}]}};
+let UMLKEY="chain"; const UMLSTEP={chain:0,guards:0,direct:0};
+function renderUML(){ const U=UML[UMLKEY], P=U.parts||PARTS, cur=UMLSTEP[UMLKEY], n=P.length, W=n*120+40, X0=66, dx=(W-2*X0)/(n-1), top=74, rowH=44;
+  const xs=Object.fromEntries(P.map((p,i)=>[p[0],X0+i*dx])), H=top+30+U.steps.length*rowH+30;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" class="w-full">`;
+  P.forEach(([k,t,sub,tone])=>{ const [bg,st,tx]=TONES[tone], x=xs[k]; svg+=`<line x1="${x}" y1="${top}" x2="${x}" y2="${H-10}" stroke="#d4d4d8" stroke-dasharray="4 4"/><rect x="${x-56}" y="8" width="112" height="${top-18}" rx="9" fill="${bg}" stroke="${st}"/><text x="${x}" y="30" text-anchor="middle" style="font-size:11.5px;font-weight:600;fill:${tx}">${esc(t)}</text><text x="${x}" y="45" text-anchor="middle" style="font-size:9.5px;fill:#71717a">${esc(sub)}</text>`; });
+  let i0=0; while(i0<U.steps.length){ const f=U.steps[i0].frag; let i1=i0; while(i1+1<U.steps.length&&U.steps[i1+1].frag===f) i1++;
+    if(f){ const idx=[...Array(i1-i0+1).keys()].map(k=>k+i0); const xa=Math.min(...idx.map(i=>Math.min(xs[U.steps[i].f],xs[U.steps[i].t])))-46, xb=Math.max(...idx.map(i=>Math.max(xs[U.steps[i].f],xs[U.steps[i].t])))+170, y0=top+30+i0*rowH-28, y1=top+30+i1*rowH+14;
+      svg+=`<rect x="${xa}" y="${y0}" width="${xb-xa}" height="${y1-y0}" fill="none" stroke="#a1a1aa" stroke-width="1.2"/><rect x="${xa}" y="${y0}" width="36" height="16" fill="#f4f4f5" stroke="#a1a1aa"/><text x="${xa+18}" y="${y0+12}" text-anchor="middle" style="font-size:10px;font-weight:700;fill:#3f3f46">opt</text><text x="${xa+44}" y="${y0+12}" style="font-size:10px;fill:#3f3f46">[${esc(f)}]</text>`; } i0=i1+1; }
+  U.steps.forEach((m,i)=>{ const y=top+30+i*rowH, x1=xs[m.f], x2=xs[m.t], state=i<cur?"past":i===cur?"cur":"future";
+    const col=m.bad&&state!=="future"?"#e11d48":state==="cur"?"#2563eb":state==="past"?"#52525b":"#d4d4d8", op=state==="future"?.35:1, sw=state==="cur"?2.4:1.4, tc=m.bad&&state!=="future"?"#be123c":state==="cur"?"#1d4ed8":"#3f3f46";
+    const lbl=`<tspan style="font-weight:700">${i+1}.</tspan> ${esc(m.l)}`; svg+=`<g onclick="umlGo(${i})" style="cursor:pointer;opacity:${op}" data-step="${i}">`;
+    if(m.f===m.t) svg+=`<path d="M${x1},${y-8} h34 v18 h-34" fill="none" stroke="${col}" stroke-width="${sw}"/><polygon points="${x1},${y+10} ${x1+8},${y+6} ${x1+8},${y+14}" fill="${col}"/><text x="${x1+42}" y="${y+5}" style="font-size:11.5px;fill:${tc}">${lbl}</text>`;
+    else { const dir=x2>x1?1:-1; svg+=`<line x1="${x1}" y1="${y}" x2="${x2-dir*7}" y2="${y}" stroke="${col}" stroke-width="${sw}" ${m.r?'stroke-dasharray="6 4"':""}/><polygon points="${x2},${y} ${x2-dir*9},${y-5} ${x2-dir*9},${y+5}" fill="${col}"/><rect x="${Math.min(x1,x2)+8}" y="${y-19}" width="${Math.abs(x2-x1)-16}" height="16" fill="transparent"/><text x="${(x1+x2)/2}" y="${y-6}" text-anchor="middle" style="font-size:11.5px;fill:${tc};paint-order:stroke;stroke:#fff;stroke-width:3px">${lbl}</text>`; }
+    if(state==="cur") svg+=`<circle cx="${x1}" cy="${y}" r="4" fill="${m.bad?"#e11d48":"#2563eb"}"/>`; svg+=`</g>`; });
+  svg+=`</svg>`; const m=U.steps[cur], pf=P.find(p=>p[0]===m.f), pt=P.find(p=>p[0]===m.t), pay=typeof m.p==="function"?m.p():m.p;
+  const tab=(k,t)=>`<button onclick="UMLKEY='${k}';renderUML()" class="rounded-lg px-3 py-1.5 text-sm font-medium ${UMLKEY===k?"bg-zinc-900 text-white":"text-zinc-600 hover:bg-zinc-100"}">${t}</button>`;
+  $("#uml").innerHTML=`<div class="flex flex-wrap items-end justify-between gap-3"><div><div class="mb-1 text-xs font-semibold uppercase tracking-wide text-blue-600">UML · sequence</div><h2 class="text-lg font-semibold tracking-tight text-zinc-900">${esc(U.title)}</h2><p class="mt-1 max-w-4xl text-sm text-zinc-500">${esc(U.sub)}</p>
+      <div class="mt-2 inline-flex gap-1 rounded-xl border border-zinc-200 bg-white p-1">${tab("chain","The chain")}${tab("guards","Guardrails")}${tab("direct","Direct (no Gateway)")}</div></div>
+    <div class="flex items-center gap-2"><button onclick="umlGo(0)" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"><i data-lucide="rotate-ccw" class="h-4 w-4"></i></button>
+      <button onclick="umlGo(${cur-1})" ${cur===0?"disabled":""} class="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"><i data-lucide="chevron-left" class="h-4 w-4"></i> Prev</button>
+      <span class="min-w-[70px] text-center font-mono text-sm text-zinc-600">${cur+1} / ${U.steps.length}</span>
+      <button onclick="umlGo(${cur+1})" ${cur===U.steps.length-1?"disabled":""} class="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40">Next <i data-lucide="chevron-right" class="h-4 w-4"></i></button></div></div>
+    <div class="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_400px]"><div id="uml-scroll" class="scroll-thin overflow-auto rounded-xl border border-zinc-200 bg-white p-3 shadow-sm" style="max-height:calc(100vh - 250px)">${svg}</div>
+      <div class="sticky top-[70px] self-start rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"><div class="flex items-center gap-2"><span class="flex h-6 w-6 items-center justify-center rounded-full ${m.bad?"bg-rose-600":"bg-blue-600"} text-[12px] font-bold text-white">${cur+1}</span><span class="text-[15px] font-semibold text-zinc-900">${esc(m.l)}</span></div>
+        <div class="mt-1 text-[12.5px] text-zinc-500">${esc(pf[1])}${m.f===m.t?"":" → "+esc(pt[1])}${m.r?" · reply":""}${m.frag?` · <span class="rounded bg-zinc-100 px-1">${esc(m.frag)}</span>`:""}</div>
+        ${m.d?`<div class="mt-3 text-[14px] leading-relaxed text-zinc-700">${m.d}</div>`:""}${pay?pre(pay,"max-h-[48vh]"):""}
+        <div class="mt-3 text-[11.5px] text-zinc-400">← / → keys step through · click any arrow to jump · values are this deployment's</div></div></div>`;
+  icons(); const g=document.querySelector(`#uml g[data-step="${cur}"]`), box=$("#uml-scroll"); if(g&&box){ const r=g.getBoundingClientRect(), b=box.getBoundingClientRect(); if(r.top<b.top+40||r.bottom>b.bottom-40) box.scrollTop+=r.top-b.top-b.height/2; } }
+function umlGo(i){ UMLSTEP[UMLKEY]=Math.max(0,Math.min(UML[UMLKEY].steps.length-1,i)); renderUML(); }
+document.addEventListener("keydown",e=>{ if(view!=="uml"||e.target.closest("textarea,input")) return; if(e.key==="ArrowRight"){e.preventDefault();umlGo(UMLSTEP[UMLKEY]+1);} if(e.key==="ArrowLeft"){e.preventDefault();umlGo(UMLSTEP[UMLKEY]-1);} });
+
+// ---------------- architecture ----------------
+const TONE={zinc:["bg-zinc-100","text-zinc-700","border-l-zinc-400"],violet:["bg-violet-100","text-violet-700","border-l-violet-500"],blue:["bg-blue-100","text-blue-700","border-l-blue-500"],indigo:["bg-indigo-100","text-indigo-700","border-l-indigo-500"],
+  orange:["bg-orange-100","text-orange-700","border-l-orange-500"],amber:["bg-amber-100","text-amber-700","border-l-amber-500"],teal:["bg-teal-100","text-teal-700","border-l-teal-500"],emerald:["bg-emerald-100","text-emerald-700","border-l-emerald-500"]};
+const ZONE={violet:["border-violet-200","bg-violet-50/30","text-violet-600"],blue:["border-blue-200","bg-blue-50/30","text-blue-600"],orange:["border-orange-200","bg-orange-50/30","text-orange-600"],teal:["border-teal-200","bg-teal-50/30","text-teal-600"]};
+function xcard(k,t,s,tone,icon,extra){ const [bg,tx,rail]=TONE[tone]; return `<div data-xnode="${k}" class="xnode cursor-pointer rounded-xl border border-l-4 border-zinc-200 ${rail} bg-white p-3 shadow-sm"><div class="flex items-center gap-2.5"><div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bg} ${tx}"><i data-lucide="${icon}" class="h-4 w-4"></i></div><div class="min-w-0"><div class="text-[14px] font-semibold leading-tight text-zinc-900">${t}</div><div class="text-[12px] leading-snug text-zinc-500">${s}</div></div><i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-zinc-300"></i></div>${extra||""}</div>`; }
+const down=l=>`<div class="flex items-center justify-center gap-2 py-1"><i data-lucide="arrow-down" class="h-4 w-4 text-zinc-300"></i>${l?`<span class="font-mono text-[10.5px] text-zinc-400">${l}</span>`:""}</div>`;
+const across=(l,s,node)=>`<div ${node?`data-xnode="${node}"`:""} class="flex w-[92px] shrink-0 flex-col items-center justify-center rounded-lg py-2 text-center ${node?"xnode cursor-pointer hover:bg-zinc-50":""}"><span class="font-mono text-[11px] font-semibold text-zinc-600">${l}</span><i data-lucide="arrow-right" class="my-1 h-5 w-5 text-zinc-300"></i><span class="text-[10px] leading-tight text-zinc-400">${s||""}</span>${node?`<span class="mt-1 text-[10px] font-medium text-blue-600">what it carries</span>`:""}</div>`;
+const zone=(c,t,inner,sub)=>`<div class="min-w-0 flex-1 rounded-2xl border-2 border-dashed ${ZONE[c][0]} ${ZONE[c][1]} p-3"><div class="mb-2 text-[11px] font-semibold uppercase tracking-wide ${ZONE[c][2]}">${t}${sub?` <span class="font-normal normal-case opacity-70">${sub}</span>`:""}</div>${inner}</div>`;
+// ---------------- architecture · Part 1: the identity federation setup, built up click by click ----------------
+let ARCHTAB="p1", DARCHTAB="p1", P1STEP=0, P1P="gw"; const P1S={gw:0,direct:0};
+function useP1(p){ if(!p||p===P1P) return; P1S[P1P]=P1STEP; P1P=p; P1STEP=P1S[p]; }
+const mask=(v,a=4,b=4)=>{ v=String(v||""); if(!v) return "…"; return v.length<=a+b+2?v:v.slice(0,a)+"•".repeat(Math.min(10,v.length-a-b))+v.slice(-b); };
+function p1Cells(){ const S=STATUS, ok=S.okta||{}, om=S.openai_map||{teams:{}}, host=(ok.users_issuer||"https://your-org.okta.com").replace("https://","").split("/")[0];
+  const asid=u=>(u||"").split("/").pop(), iss=(om.aws_issuer||"https://<account-issuer-id>.tokens.sts.global.api.aws").replace("https://",""), t=om.teams||{};
+  const box=(id,st,cls,title,lis,cfg,extra="")=>({id,st,html:`<div class="p1box ${cls}" ${extra}><b>${title}</b><ul>${lis.map(l=>`<li>${l}</li>`).join("")}</ul>${cfg?`<div class="p1cfg">${cfg}</div>`:""}</div>`});
+  const arr=(id,st,n,label,dir,teal)=>({id,st,html:`<div class="p1arr ${teal?"tl":""}"><span class="p1n">${n}</span><div class="ln">${dir==="r"?'<i></i><span class="tip">▶</span>':'<span class="tip">◀</span><i></i>'}</div>${label}</div>`});
+  const V0=c=>`style="border-left-color:${c}"`, PU="#8b5cf6", OR="#f97316", TE="#14b8a6", BL="#3b82f6", EM="#10b981";
+  const R={ hdr:[`<div class="p1hd" style="background:#ede9fe;color:#6d28d9">Okta · corporate identity<span>org ${esc(mask(host.split(".")[0],13,2))}</span></div>`,`<div class="p1hd" style="background:#ffedd5;color:#c2410c">AWS · account ${esc(mask(S.account||"111122223333"))}<span>${esc(S.region||"us-east-1")}</span></div>`,`<div class="p1hd" style="background:#ccfbf1;color:#0f766e">OpenAI · organization<span>${esc(mask(om.org_id||"org-EXAMPLE",8,4))}</span></div>`],
+   rows:[
+    [box("users",1,"",`Users and groups`,["The corporate identity: who people are","Group membership decides their team","Source of every identity claim downstream"],`ada ∈ wif-engineering · grace ∈ wif-finance`,V0(PU)),null,
+     box("nocopy",5,"",`<span style="color:#71717a">No copy in AWS</span>`,["AWS stores no users or groups","It reads them from Okta's signed tokens, on every request"],"",V0("#e4e4e7")),null,
+     box("proj",10,"",`Projects`,["Hold each team's service account (who OpenAI bills)","Limit which models a team can use"],`Engineering → ${esc((t.engineering?.project_models||["gpt-5.6-sol"]).join(", "))} · Finance → ${esc((t.finance?.project_models||["gpt-5.6-terra"]).join(", "))}`,V0(TE))],
+    [box("signin",2,"",`Sign-in authorization server`,["Signs people in to the agent","Lets in only the wif-* groups","Issues the token the Runtime accepts"],`${esc(mask(asid(ok.users_issuer),6,4))} · aud openai-wif-demo`,V0(PU)),arr("a1",5,2,"trusts its tokens","l"),
+     box("runtime",5,"",`AgentCore Runtime · the agent`,["Hosts the agent","Admits only Okta tokens issued to this agent"],"",V0(BL)),null,null],
+    [box("agent",3,"",`AI agent · wif-openai-agent`,["Gives the agent its own identity in Okta","Holds the agent's public key, so it never needs a secret"],`client ${esc(mask(ok.agent,6,5))}`,V0(PU)),arr("a2",4,1,"trusts the agent's signature","r"),
+     box("kms",4,"",`KMS key + AgentCore Identity`,["Keep the agent's private key inside KMS","Sign as the agent to get tokens for a user (the delegation)"],`alias/openai-wif-agent`,V0(OR)),null,null],
+    [{...box("gwas",6,"",`wif-gateway authorization server`,["Issues delegated tokens: a user + the agent acting for them","Only the agent may ask, and only for signed-in users","Puts the user's groups and team in the token"],`${esc(mask(asid(ok.gateway_issuer),6,4))} · aud openai-wif-gateway`,V0(PU)),span:2},arr("a3",7,3,"trusts its tokens","l"),
+     box("gateway",7,"",`AgentCore Gateway`,["One door to OpenAI for every agent","Admits only delegated tokens","Cedar: the user's group decides the models"],Object.entries(S.gateway?.group_models||{}).map(([g,m])=>`${esc(g)} → ${esc(m.join(", "))}`).join(" · "),V0(OR)),null,null],
+    ["skip",arr("a4",11,5,"trusts its tokens","l"),
+     box("iam",11,"",`IAM OIDC providers`,["Register Okta's two servers as identity providers in IAM","Let an Okta token be exchanged for AWS credentials"],`wif-gateway (aud openai-wif-gateway) · sign-in (aud openai-wif-demo)`,V0(EM)),null,null],
+    [null,null,
+     box("roles",12,"",`IAM team roles`,["Defined in AWS IAM: one role per team","Trust policy: only Okta's tokens, and only for that role's team tag","Permission: get a token for OpenAI, nothing else"],`arn:aws:iam::${esc(mask(S.account||"111122223333"))}:role/OpenAIWifGatewayEngineeringRole<br>arn:aws:iam::${esc(mask(S.account||"111122223333"))}:role/OpenAIWifGatewayFinanceRole`,V0(EM)),arr("a6",13,6,"maps by role ARN","l",1),
+     box("maps",13,"",`Mappings`,["Turn a team role into that team's service account"],`EngineeringRole → ${esc(mask(t.engineering?.service_account_id,9,4))}<br>FinanceRole → ${esc(mask(t.finance?.service_account_id,9,4))}`,V0(TE))],
+    [null,null,
+     box("issuer",8,"",`Outbound identity federation`,["Lets AWS sign tokens that outside services can verify","Publishes the account's public keys"],esc(mask(iss.split(".")[0],4,4)+"."+iss.split(".").slice(1).join(".")),V0(OR)),arr("a5",9,4,"trusts its tokens","l"),
+     box("wip",9,"",`Workload identity provider`,["Makes OpenAI trust tokens from this AWS account","Replaces API keys"],esc(mask(om.identity_provider_id||"idp_<your-provider-id>",8,4)),V0(TE))
+]]};
+  if(P1P!=="direct") return R;
+  const users=R.rows[0][0], nocopy=R.rows[0][2], proj=R.rows[0][4], signin=R.rows[1][0], agent=R.rows[2][0], issuer=R.rows[6][2], wip=R.rows[6][4], maps={...R.rows[5][4],st:11}, roles={...R.rows[5][2],st:10};
+  return {hdr:R.hdr, rows:[
+    [{...users,st:1},null,{...nocopy,st:5},null,{...proj,st:8}],
+    [{...agent,st:2},arr("a2",3,1,"trusts the agent's signature","r"),
+     box("kms",3,"",`KMS key`,["Keeps the agent's private key inside KMS","Signs the app's sign-in request as the agent: no client secret"],`alias/openai-wif-agent`,V0(OR)),null,null],
+    [{...signin,st:4,span:2},arr("a1",5,2,"trusts its tokens","l"),
+     box("runtime",5,"",`AgentCore Runtime · the Direct agent`,["Hosts the Direct agent (Strands + OpenAI SDK)","Admits only Okta tokens issued to this agent","Uses your token itself: no Gateway, no Cedar"],"",V0(BL)),null,null],
+    ["skip",arr("a4",9,4,"trusts its tokens","l"),
+     box("iam",9,"",`IAM OIDC provider`,["Registers Okta's sign-in server in IAM","Lets your access token be exchanged for AWS credentials"],`sign-in server (aud openai-wif-demo)`,V0(EM)),null,null],
+    [null,null,roles,arr("a6",11,5,"maps by role ARN","l",1),maps],
+    [null,null,{...issuer,st:6},arr("a5",7,3,"trusts its tokens","l"),{...wip,st:7}]]}; }
+const P1STEPS=[
+ ["Start with people","Okta holds the corporate identity: users, and the groups they belong to. Group membership is what later decides a person's team."],
+ ["A sign-in server for them","Okta's sign-in server decides who may sign in (the wif-* groups) and what their token says about them."],
+ ["Give the agent its own identity","The agent is registered in Okta as an AI agent, with a public key instead of a secret."],
+ ["Keep the agent's key in AWS","The private half lives in KMS. AgentCore Identity signs with it whenever the agent needs a token for a user."],
+ ["Host the agent, trusting Okta","AgentCore Runtime admits only Okta tokens issued to this agent. AWS keeps no copy of the users; it reads them from the token."],
+ ["A server for delegated tokens","Okta's wif-gateway server issues tokens that say \"this user, with this agent acting for them\", and carry the user's groups."],
+ ["One door to OpenAI","AgentCore Gateway admits only those delegated tokens, and Cedar uses the user's group to allow models."],
+ ["Let AWS sign tokens for outsiders","Outbound identity federation gives the account an issuer whose signatures any outside service can verify."],
+ ["OpenAI trusts the AWS account","OpenAI's workload identity provider accepts tokens signed by that issuer. This is what replaces API keys."],
+ ["Projects per team","Each team has an OpenAI project with a service account and a model limit."],
+ ["IAM trusts Okta's servers","IAM OIDC providers register Okta's two servers, so an Okta token can be exchanged for AWS credentials."],
+ ["Team roles in IAM","One IAM role per team. Its trust policy admits an Okta token only if the token's team tag is that role's team; its only permission is getting a token for OpenAI."],
+ ["Team role → service account","OpenAI mappings turn each team role into that team's service account. The setup is complete."],
+ ["The whole setup","Six trust relationships, no secrets: every trust is an issuer URL plus public keys."]];
+const P1STEPS_D=[
+ ["Start with people","Okta holds the corporate identity: users, and the groups they belong to. Group membership is what later decides a person's team."],
+ ["Give the agent its own identity","The agent is registered in Okta as an AI agent, with its own sign-in app and a public key instead of a secret."],
+ ["Keep the agent's key in AWS","The private half lives in KMS and signs the sign-in request, so no client secret exists. The Direct pattern has no delegation step."],
+ ["A sign-in server for people","Okta's sign-in server decides who may sign in (the wif-* groups) and puts their team and login in the token, in the names AWS STS reads."],
+ ["Host the agent, trusting Okta","The Direct agent on AgentCore Runtime admits only Okta tokens issued to it. AWS keeps no copy of the users; it reads them from the token."],
+ ["Let AWS sign tokens for outsiders","Outbound identity federation gives the account an issuer whose signatures any outside service can verify."],
+ ["OpenAI trusts the AWS account","OpenAI's workload identity provider accepts tokens signed by that issuer. This is what replaces API keys."],
+ ["Projects per team","Each team has an OpenAI project with a service account and a model limit."],
+ ["IAM trusts Okta's sign-in server","An IAM OIDC provider registers the sign-in server, so the agent can exchange your access token for AWS credentials."],
+ ["Team roles in IAM","One IAM role per team. Its trust policy admits an Okta token only if the token's team tag is that role's team; its only permission is getting a token for OpenAI."],
+ ["Team role → service account","OpenAI mappings turn each team role into that team's service account. The setup is complete."],
+ ["The whole setup","Five trust relationships, no secrets, and no Gateway: the agent does the swaps itself."]];
+const P1TRUST_D=[[1,"a2","Okta → the agent's key.","The sign-in request is signed with KMS."],[2,"a1","Runtime → Okta sign-in.","Only tokens issued to the agent's app get in."],[3,"a5","OpenAI → the AWS account.","Its signed tokens are accepted."],
+ [4,"a4","IAM → Okta's sign-in server.","Your access token can become AWS credentials; its team tag picks the role."],[5,"a6","Mapping → team role.","Each role maps to one team's service account."]];
+const P1TRUST=[[1,"a2","Okta → the agent's key.","The agent proves itself with a KMS signature."],[2,"a1","Runtime → Okta sign-in.","Only tokens issued to the agent's app get in."],[3,"a3","Gateway → Okta wif-gateway.","Only delegated tokens get in."],
+ [4,"a5","OpenAI → the AWS account.","Its signed tokens are accepted."],[5,"a4","IAM → Okta's servers.","An Okta token can become AWS credentials; its team tag picks the role."],[6,"a6","Mapping → team role.","Each role maps to one team's service account."]];
+function renderP1(p){ useP1(p); const STEPS=P1P==="direct"?P1STEPS_D:P1STEPS, TRUST=P1P==="direct"?P1TRUST_D:P1TRUST, n=STEPS.length; P1STEP=Math.max(0,Math.min(n-1,P1STEP)); const cur=P1STEP+1, C=p1Cells();
+  const cell=c=>{ if(!c) return `<div></div>`; if(c==="skip") return ""; const vis=c.st<=cur, isNew=c.st===cur&&cur<n&&!/^a\d/.test(c.id);
+    return `<div class="p1cell ${vis?"":"p1hide"} ${isNew?"p1new rounded-[10px]":""}" ${c.span?'style="grid-row:span 2"':""}>${c.html}</div>`; };
+  const shown=TRUST.filter(([,id])=>C.rows.flat().find(c=>c&&c.id===id&&c.st<=cur));
+  const dots=STEPS.map((x,i)=>`<button onclick="P1STEP=${i};renderP1()" title="${esc(x[0])}" class="h-2.5 w-2.5 rounded-full ${i===P1STEP?"bg-blue-600":i<P1STEP?"bg-zinc-400":"bg-zinc-200"}"></button>`).join("");
+  $(P1P==="direct"?"#darch-p1":"#arch-p1").innerHTML=`<div class="flex flex-wrap items-end justify-between gap-4"><div class="min-w-0 flex-1"><div class="text-xs font-semibold uppercase tracking-wide text-zinc-400">Part 1 · the identity federation setup${P1P==="direct"?" · direct":""} · step ${cur} of ${n}</div>
+      <h2 class="text-lg font-semibold tracking-tight text-zinc-900">${esc(STEPS[P1STEP][0])}</h2><p class="mt-1 max-w-4xl text-sm text-zinc-500">${esc(STEPS[P1STEP][1])}</p></div>
+    <div class="flex shrink-0 flex-col items-end gap-2"><div class="flex items-center gap-2">
+      <button onclick="P1STEP=${n-1};renderP1()" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50">Show all</button>
+      <button onclick="P1STEP--;renderP1()" ${P1STEP===0?"disabled":""} class="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40"><i data-lucide="chevron-left" class="h-4 w-4"></i> Prev</button>
+      <button onclick="P1STEP++;renderP1()" ${P1STEP===n-1?"disabled":""} class="inline-flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40">Next <i data-lucide="chevron-right" class="h-4 w-4"></i></button></div>
+      <div class="flex items-center gap-1.5">${dots}</div></div></div>
+    <div class="mt-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm"><div class="p1g">${C.hdr[0]}<div></div>${C.hdr[1]}<div></div>${C.hdr[2]}${C.rows.map(r=>r.map(cell).join("")).join("")}</div></div>
+    <div class="mt-3 grid grid-cols-3 gap-2.5">${shown.map(([k,id,a,b])=>`<div class="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[12.5px] text-zinc-600"><span class="p1n" style="${id==="a6"?"background:#0d9488":""}">${k}</span> <b class="text-zinc-800">${a}</b> ${b}</div>`).join("")}</div>
+    <div class="mt-2 text-[11px] text-zinc-400">← / → keys step through · IDs are partially masked</div>`; icons(); }
+// ---------------- Part 3 · components (block diagram) ----------------
+const OWN={okta:["Okta","#8b5cf6"],ac:["AWS · AgentCore","#3b82f6"],lambda:["AWS · Lambda","#f97316"],aws:["AWS","#10b981"],obs:["AWS","#71717a"],openai:["OpenAI","#14b8a6"],local:["Your laptop","#a1a1aa"]};
+let P3SEL=null; const P3S={gw:0,direct:0}, P3SEEN={gw:-1,direct:-1};
+const p3Max=M=>Math.max(...M.arrows.map(a=>a[2]||0))+1;   // last step = everything, incl. the dashed lines
+function p3Go(p,k){ const M=p3Model(p); P3S[p]=Math.max(0,Math.min(p3Max(M),k)); P3SEL=null; renderP3(p); }
+function p3Model(p){ const S=STATUS, ok=S.okta||{}, om=S.openai_map||{teams:{}}, g=S.gateway||{}, acct=mask(S.account||"111122223333"), asid=u=>(u||"").split("/").pop();
+  const B=(id,r,c,own,title,lis,cfg,cs=1)=>({id,r,c,cs,own,title,lis,cfg});
+  const signin=B("signin",1,1,"okta","Sign-in authorization server",["Signs people in: users + wif-* groups","Issues the access token the Runtime accepts"],`${esc(mask(asid(ok.users_issuer),6,4))} · aud openai-wif-demo`);
+  const console_=B("console",2,1,"local","Console (this app)",["Signs the person in with Okta","Picks a configuration bundle, calls the agent"],"localhost:8090 · console/server.py");
+  const bundles=B("bundles",p==="gw"?4:3,p==="gw"?2:1,"ac","Configuration bundles ×3",["Each pins the agent's model_id: terra · luna · sol","Chosen per request (W3C baggage)"],Object.values(S.bundles||{}).map(b=>esc(b.name)).join(" · ")||"wif_model_terra · wif_model_luna · wif_model_sol");
+  const iamsts=B("iam",3,p==="gw"?4:2,"aws","IAM + STS",["2 IAM OIDC providers: Okta's servers","Team roles: trust only that team's Okta tag","Outbound identity federation: STS signs the AWS JWT"],"OpenAIWifGateway{Engineering,Finance}Role");
+  const wif=B("wif",3,p==="gw"?5:3,"openai","Workload identity federation",["Provider trusts this AWS account's issuer","Mappings: team role → team service account","Projects limit each team's models"],`${esc(mask(om.identity_provider_id||"idp_<your-provider-id>",8,4))} · auth.openai.com/oauth/token`);
+  const api=B("api",2,p==="gw"?5:3,"openai","OpenAI API",["Answers chat/completions","Bearer: short-lived token of the team's service account"],"api.openai.com/v1 · "+esc((g.models||["gpt-5.6-sol","gpt-5.6-terra","gpt-5.6-luna"]).join(", ")));
+  if(p==="gw") return {cols:5, boxes:[signin,
+    B("oktaagent",1,2,"okta","AI agent + wif-gateway server",["The agent's own Okta identity (public key only)","Issues the delegated Gateway token: user + agent (act), groups, team"],`client ${esc(mask(ok.agent,6,5))} · ${esc(mask(asid(ok.gateway_issuer),6,4))}`,1),
+    console_,
+    B("runtime",2,2,"ac","AgentCore Runtime · the agent",["Strands agent; admits only Okta tokens issued to it","Reaches OpenAI only through the Gateway"],`${esc(mask(S.runtime?.id||"openai_wif_agent-Yzu04J8ZKC",9,4))} · OpenAIWifAgentRuntimeRole`),
+    B("gateway",2,3,"ac","AgentCore Gateway",["Admits only delegated Gateway tokens (custom JWT)","Inference target openai → the Lambda, signed with the Gateway's IAM role","Passes X-Person-Token through (header allowlist)"],`${esc(mask(g.id||"openai-wif-obo-gw-kyvcrvscfi",9,4))} · target ${esc(g.target||"openai")}`),
+    B("lambda",2,4,"lambda","Lambda · openai-wif-translator",["The Gateway's model provider: OpenAI-compatible /v1","Function URL with IAM auth: only the Gateway role may call it","Its own role can only write logs: the Okta token is the credential"],"Function URL · AWS_IAM · python3.13"),
+    api,
+    B("identity",3,2,"ac","AgentCore Identity + KMS",["Workload identity for the agent","2 OAuth providers: ID-JAG, then the Gateway token","Signs as the agent with a KMS key (no secret)"],`openai-wif-agent-delegate · alias/openai-wif-agent`),
+    B("policy",3,3,"ac","AgentCore Policy · Cedar",["Policy engine on the Gateway","Per Okta group: which models"],Object.entries(g.group_models||{}).map(([k,m])=>`${esc(k)} → ${esc(m.join(", "))}`).join(" · ")),
+    iamsts, wif, bundles,
+    B("evidence",4,3,"obs","CloudWatch Logs + CloudTrail",["Translator log: person, AWS JWT jti → OpenAI jti","CloudTrail: AssumeRoleWithWebIdentity, GetWebIdentityToken with sourceIdentity"],"/aws/lambda/openai-wif-translator",2)],
+    arrows:[["console","signin",1,"Console → Okta","the person signs in: id_token + access token"],
+      ["console","runtime",2,"Console → Runtime","access token (Bearer) + the bundle in W3C baggage"],
+      ["runtime","bundles",3,"Runtime → bundle","reads model_id",{fs:"r",ts:"r"}],
+      ["runtime","identity",4,"Agent → AgentCore Identity","get a token for this user"],
+      ["identity","oktaagent",5,"AgentCore Identity → Okta","KMS-signed assertion → ID-JAG → Gateway token (sub = user, act = agent)",{fs:"l",ts:"l",bt:.18}],
+      ["runtime","gateway",6,"Agent → Gateway","POST /inference · Bearer Gateway token + X-Person-Token"],
+      ["gateway","oktaagent",0,"Gateway ⇢ Okta","checks the token against wif-gateway's keys",{dash:1,fs:"t",ts:"r"}],
+      ["gateway","policy",7,"Gateway → Cedar","the user's group → allowed models"],
+      ["gateway","lambda",8,"Gateway → Lambda","Function URL · SigV4 as the Gateway role · X-Person-Token"],
+      ["lambda","iam",9,"Lambda → STS","AssumeRoleWithWebIdentity (Okta token) → GetWebIdentityToken (AWS JWT names the user)"],
+      ["lambda","wif",10,"Lambda → OpenAI auth","AWS JWT → OpenAI token (team service account)",{fs:"r",ts:"t",fp:.8}],
+      ["lambda","api",11,"Lambda → OpenAI","chat/completions · Bearer OpenAI token"],
+      ["iam","evidence",0,"STS + Lambda ⇢ logs","CloudTrail and the translator log record the person",{dash:1}]]};
+  return {cols:3, boxes:[signin, console_,
+    B("runtime",2,2,"ac","AgentCore Runtime · direct agent",["Strands agent; admits only Okta tokens issued to the agent","Calls OpenAI itself with the OpenAI SDK (workload_identity)"],`${esc(mask(S.direct?.id||"openai_wif_direct_agent-Y8s6203Ame",9,4))} · OpenAIWifDirectAgentRole`),
+    api, bundles, iamsts, wif,
+    B("evidence",4,2,"obs","CloudTrail",["AssumeRoleWithWebIdentity, GetWebIdentityToken with sourceIdentity"],"no Lambda, no Gateway on this path")],
+    arrows:[["console","signin",1,"Console → Okta","the person signs in: id_token + access token"],
+      ["console","runtime",2,"Console → Runtime","access token (Bearer) + the bundle in W3C baggage"],
+      ["runtime","bundles",3,"Runtime → bundle","reads model_id",{fs:"b",ts:"t",fp:.06,tp:.85}],
+      ["runtime","iam",4,"Agent → STS","AssumeRoleWithWebIdentity (Okta token) → GetWebIdentityToken (AWS JWT names the user)"],
+      ["runtime","wif",5,"OpenAI SDK → OpenAI auth","AWS JWT → OpenAI token (team service account)",{fs:"b",ts:"t",fp:.94,tp:.15}],
+      ["runtime","api",6,"Agent → OpenAI","chat/completions · Bearer OpenAI token"],
+      ["iam","evidence",0,"STS ⇢ CloudTrail","records the person",{dash:1}]]}; }
+function p3Shown(p,M){ const k=P3S[p], all=k>=p3Max(M), ids=new Set(["console"]);
+  M.arrows.forEach(a=>{ if(all||(a[2]&&a[2]<=k)){ ids.add(a[0]); ids.add(a[1]); } }); if(all) M.boxes.forEach(b=>ids.add(b.id));
+  return {k,all,ids,arrows:M.arrows.filter(a=>all||(a[2]&&a[2]<=k))}; }
+function renderP3(p){ const M=p3Model(p), host=$(p==="gw"?"#arch-p3":"#darch-p3"), rows=Math.max(...M.boxes.map(b=>b.r)), S=p3Shown(p,M), N=p3Max(M);
+  const cur=S.all||!S.k?null:M.arrows.find(a=>a[2]===S.k), fresh=P3SEEN[p]!==S.k; P3SEEN[p]=S.k;
+  const newIds=new Set(cur?[cur[1]]:[]);
+  const box=b=>{ const [lab,col]=OWN[b.own], vis=S.ids.has(b.id), hl=P3SEL?M.arrows.some(a=>a[2]===P3SEL&&(a[0]===b.id||a[1]===b.id)):cur?(cur[0]===b.id||cur[1]===b.id):true;
+    return `<div data-p3="${b.id}" class="relative rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition-opacity ${vis&&fresh&&newIds.has(b.id)?"p3in":""}" style="grid-row:${b.r};grid-column:${b.c} / span ${b.cs};border-left:4px solid ${col};visibility:${vis?"visible":"hidden"};opacity:${hl?1:.45}">
+      <div class="flex items-start justify-between gap-2"><b class="text-[13.5px] leading-snug text-zinc-900">${b.title}</b><span class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold" style="background:${col}1a;color:${col}">${lab}</span></div>
+      <ul class="mt-1.5 list-disc space-y-0.5 pl-4 text-[12px] leading-snug text-zinc-600">${b.lis.map(l=>`<li>${l}</li>`).join("")}</ul>
+      ${b.cfg?`<div class="mt-2 truncate rounded bg-zinc-50 px-1.5 py-1 font-mono text-[10.5px] text-zinc-500" title="${b.cfg.replace(/"/g,"&quot;")}">${b.cfg}</div>`:""}</div>`; };
+  const legend=M.arrows.filter(a=>a[2]&&S.all).map(a=>`<div onmouseenter="P3SEL=${a[2]};renderP3('${p}')" onmouseleave="P3SEL=null;renderP3('${p}')" class="cursor-default rounded-lg border ${P3SEL===a[2]?"border-blue-400 bg-blue-50":"border-zinc-200 bg-white"} px-3 py-1.5 text-[12.5px] text-zinc-600"><span class="p1n">${a[2]}</span> <b class="text-zinc-800">${a[3]}</b> ${a[4]}</div>`).join("");
+  host.innerHTML=`<div class="rounded-xl border border-zinc-200 bg-zinc-50/50 p-5"><div class="mb-3 flex flex-wrap items-center gap-3 text-[12px] text-zinc-500"><b class="text-zinc-800">${p==="gw"?"Through the Gateway":"Direct"}: every component in the request path</b>
+      ${Object.entries({okta:1,ac:1,lambda:p==="gw",aws:1,openai:1,local:1}).filter(([,v])=>v).map(([k])=>`<span class="inline-flex items-center gap-1"><i class="inline-block h-2.5 w-2.5 rounded-sm" style="background:${OWN[k][1]}"></i>${OWN[k][0]}</span>`).join("")}<span class="text-zinc-400">· IDs partially masked${S.all?" · hover a step to trace it":" · ← / → or Next"}</span>
+      <span class="ml-auto flex items-center gap-2"><span class="text-zinc-400">${S.all?"All steps":S.k===0?"Start":`Step ${S.k} of ${N-1}`}</span>
+        <button onclick="p3Go('${p}',P3S['${p}']-1)" ${S.k===0?"disabled":""} class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-40">‹ Prev</button>
+        <button id="p3next-${p}" onclick="p3Go('${p}',P3S['${p}']+1)" ${S.all?"disabled":""} class="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-40">Next ›</button>
+        <button onclick="p3Go('${p}',${S.all?0:N})" class="rounded-lg px-2 py-1.5 text-sm text-zinc-500 hover:bg-zinc-100">${S.all?"Restart":"Show all"}</button></span></div>
+    <div class="mb-3 min-h-[44px] rounded-lg ${cur?"border border-blue-200 bg-blue-50/60":S.all?"border border-zinc-200 bg-white":"border border-zinc-200 bg-white"} px-4 py-2.5 text-[14px] text-zinc-700">${cur?`<span class="p1n" style="background:#2563eb">${cur[2]}</span> <b class="text-zinc-900">${cur[3]}</b> · ${cur[4]}`:S.all?`<b class="text-zinc-900">The whole path.</b> Dashed lines check or record; they are not on the request path.`:`<b class="text-zinc-900">${p==="gw"?"Through the Gateway":"Direct"}.</b> It starts with the person, in the console. Click Next to follow the request.`}</div>
+    <div class="relative" id="p3wrap-${p}"><div class="grid" style="grid-template-columns:repeat(${M.cols},minmax(0,1fr));grid-template-rows:repeat(${rows},auto);column-gap:64px;row-gap:44px">${M.boxes.map(box).join("")}</div><svg class="pointer-events-none absolute inset-0 h-full w-full overflow-visible"></svg></div>
+    ${S.all?`<div class="mt-5 grid gap-2" style="grid-template-columns:repeat(${p==="gw"?3:2},minmax(0,1fr))">${legend}</div>`:""}
+    <div class="mt-2 text-[11px] text-zinc-400">Dashed = checks and records, not on the request path.${p==="gw"?" Not shown: the earlier per-team Gateway targets and usage-interceptor Lambda, left in place but not used.":""}</div></div>`;
+  requestAnimationFrame(()=>drawP3(p,M,S,cur)); }
+function drawP3(p,M,S,cur){ S=S||p3Shown(p,M); const wrap=$(`#p3wrap-${p}`); if(!wrap||!wrap.offsetParent) return; const svg=wrap.querySelector("svg"), W=wrap.getBoundingClientRect();
+  const R=id=>{ const r=wrap.querySelector(`[data-p3="${id}"]`).getBoundingClientRect(); return {l:r.left-W.left,t:r.top-W.top,r:r.right-W.left,b:r.bottom-W.top,cx:(r.left+r.right)/2-W.left,cy:(r.top+r.bottom)/2-W.top}; };
+  const pt=(r,side,other)=>side==="l"?[r.l,side===other.side?r.cy:Math.max(r.t+14,Math.min(r.b-14,other.y))]:side==="r"?[r.r,Math.max(r.t+14,Math.min(r.b-14,other.y))]:side==="t"?[Math.max(r.l+14,Math.min(r.r-14,other.x)),r.t]:[Math.max(r.l+14,Math.min(r.r-14,other.x)),r.b];
+  const out={l:[-1,0],r:[1,0],t:[0,-1],b:[0,1]}; let h='<defs><marker id="p3h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="context-stroke"/></marker></defs>';
+  for(const a of S.arrows){ const o=a[5]||{}, A=R(a[0]), Bx=R(a[1]);
+    let fs=o.fs, ts=o.ts; if(!fs){ const ov=Math.min(A.b,Bx.b)-Math.max(A.t,Bx.t), ovx=Math.min(A.r,Bx.r)-Math.max(A.l,Bx.l);
+      if(ov>20){ fs=Bx.cx>A.cx?"r":"l"; ts=fs==="r"?"l":"r"; } else if(ovx>20){ fs=Bx.cy>A.cy?"b":"t"; ts=fs==="b"?"t":"b"; } else { fs=Bx.cx>A.cx?"r":"l"; ts=Bx.cy>A.cy?"t":"b"; } }
+    const same=(fs==="l"||fs==="r")&&fs===ts, midY=same?null:(Math.max(A.t,Bx.t)+Math.min(A.b,Bx.b))/2, midX=(Math.max(A.l,Bx.l)+Math.min(A.r,Bx.r))/2;
+    const s0=(fs==="l"||fs==="r")?[fs==="l"?A.l:A.r, same?A.cy+(Bx.cy>A.cy?18:-18):(midY>A.t&&midY<A.b?midY:A.cy)]:[midX>A.l&&midX<A.r?midX:A.cx, fs==="t"?A.t:A.b];
+    const e0=(ts==="l"||ts==="r")?[ts==="l"?Bx.l:Bx.r, same?Bx.cy:(midY>Bx.t&&midY<Bx.b?midY:Bx.cy)]:[midX>Bx.l&&midX<Bx.r?midX:Bx.cx, ts==="t"?Bx.t:Bx.b];
+    if(o.fp){ if(fs==="l"||fs==="r") s0[1]=A.t+(A.b-A.t)*o.fp; else s0[0]=A.l+(A.r-A.l)*o.fp; }
+    if(o.tp){ if(ts==="l"||ts==="r") e0[1]=Bx.t+(Bx.b-Bx.t)*o.tp; else e0[0]=Bx.l+(Bx.r-Bx.l)*o.tp; }
+    const k=same?44:Math.max(30,Math.hypot(e0[0]-s0[0],e0[1]-s0[1])/2.6), c1=[s0[0]+out[fs][0]*k,s0[1]+out[fs][1]*k], c2=[e0[0]+out[ts][0]*k,e0[1]+out[ts][1]*k];
+    const sel=P3SEL?P3SEL===a[2]:!!cur&&cur===a, dim=P3SEL&&!sel, col=a[2]?(sel?"#2563eb":"#52525b"):"#a1a1aa";
+    h+=`<path d="M${s0} C${c1} ${c2} ${e0}" fill="none" stroke="${col}" stroke-width="${sel?2.6:1.6}" ${o.dash?'stroke-dasharray="5 4"':""} marker-end="url(#p3h)" opacity="${dim?.18:1}"/>`;
+    if(a[2]){ const t=o.bt||.5, u=1-t, bz=i=>u*u*u*s0[i]+3*u*u*t*c1[i]+3*u*t*t*c2[i]+t*t*t*e0[i], m=[bz(0),bz(1)];
+      h+=`<g opacity="${dim?.25:1}"><circle cx="${m[0]}" cy="${m[1]}" r="10" fill="${sel?"#2563eb":"#18181b"}"/><text x="${m[0]}" y="${m[1]+3.8}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">${a[2]}</text></g>`; } }
+  svg.innerHTML=h; }
+window.addEventListener("resize",()=>{ if(view==="arch"&&ARCHTAB==="p3") renderP3("gw"); if(view==="darch"&&DARCHTAB==="p3") renderP3("direct"); });
+document.addEventListener("keydown",e=>{ const p=view==="arch"&&ARCHTAB==="p3"?"gw":view==="darch"&&DARCHTAB==="p3"?"direct":null; if(!p||e.target.closest("textarea,input")) return;
+  if(e.key==="ArrowRight"){ e.preventDefault(); p3Go(p,P3S[p]+1); } if(e.key==="ArrowLeft"){ e.preventDefault(); p3Go(p,P3S[p]-1); } });
+function archTab(t){ ARCHTAB=t; renderArch(); }
+document.addEventListener("keydown",e=>{ if(!((view==="arch"&&ARCHTAB==="p1")||(view==="darch"&&DARCHTAB==="p1"))||e.target.closest("textarea,input")) return; useP1(view==="darch"?"direct":"gw"); if(e.key==="ArrowRight"){ P1STEP++; renderP1(); } if(e.key==="ArrowLeft"){ P1STEP--; renderP1(); } });
+function renderArch(){ const tab=(k,t)=>`<button onclick="archTab('${k}')" class="rounded-lg px-3 py-1.5 text-sm font-medium ${ARCHTAB===k?"bg-zinc-900 text-white":"text-zinc-600 hover:bg-zinc-100"}">${t}</button>`;
+  $("#arch-tabs").innerHTML=tab("p1","Part 1 · Identity setup")+tab("p2","Part 2 · How identity propagates")+tab("p3","Part 3 · Components");
+  $("#arch-p1").classList.toggle("hidden",ARCHTAB!=="p1"); $("#arch-p2").classList.toggle("hidden",ARCHTAB!=="p2"); $("#arch-p3").classList.toggle("hidden",ARCHTAB!=="p3");
+  if(ARCHTAB==="p1"){ renderP1("gw"); return; }
+  if(ARCHTAB==="p3"){ renderP3("gw"); return; }
+  renderMap("gw"); }
+function darchTab(t){ DARCHTAB=t; renderDArch(); }
+
+// ---------------- token flow: the key components, and the token each hands the next ----------------
+const TD={gw:{},direct:{}}, TFS={gw:{},direct:{}};
+const pat=()=>["dlive","darch"].includes(view)?"direct":"gw";
+const me=()=>STATUS.user?.login||"ada.lovelace@example.com";
+const NS_STS="https://sts.amazonaws.com/", NS_OAI="https://api.openai.com/auth";
+const pick=(c,k)=>Array.isArray(k)?c?.[k[0]]?.[k[1]]:c?.[k];
+const TK={
+  okta:{n:"Okta access token",sig:"Okta",tone:"violet",who:()=>["p","you"],key:["sub","uid","cid","aud","scp","exp"],
+    p:["Okta issues it when you sign in to the agent's own app.","AgentCore Runtime admits it only if <code>cid</code> = the agent.","Names <b>you</b>: <code>sub</code> = your login."],
+    ex:()=>({sub:me(),cid:V.agent(),aud:"openai-wif-demo",scp:["openai-agent.invoke"]})},
+  idt:{n:"id_token",sig:"Okta",tone:"violet",who:()=>["p","you"],key:["sub","preferred_username","aud","exp"],
+    p:["Proves you signed in to this agent (<code>aud</code> = the agent).","AgentCore Identity sends it to Okta to start the delegation (ID-JAG).","Never reaches the Gateway, AWS or OpenAI."],
+    ex:()=>({sub:"00u…",preferred_username:me(),aud:V.agent()})},
+  gwt:{n:"Gateway token",sig:"Okta",tone:"violet",who:()=>["p","you + agent"],key:["sub","act","cid","team","groups","aud","exp"],
+    p:["Okta issues it to the agent, through an ID-JAG, for the Gateway only (<code>aud</code>).","<code>sub</code> = you · <code>act</code> = the agent · <code>team</code>/<code>groups</code> = your group.","Bearer for the Gateway (Cedar reads <code>groups</code>); also sent as <code>X-Person-Token</code> for the translator."],
+    ex:()=>({sub:me(),act:{sub:V.agent()},cid:V.agent(),team:V.team(),groups:["wif-"+V.team()],aud:"openai-wif-gateway"})},
+  sigv4:{n:"SigV4 signature",sig:"AWS IAM",tone:"orange",who:()=>["r","Gateway role"],key:null,
+    p:["The Gateway signs the call with its own IAM role: no OpenAI key anywhere.","The translator's Function URL accepts IAM-signed calls only.","You ride along in the <code>X-Person-Token</code> header (the Gateway token)."],
+    ex:()=>({signed_by:"assumed-role/OpenAIWifGatewayServiceRole",service:"lambda · Function URL (AWS_IAM)","X-Person-Token":"<the Gateway token>"})},
+  idc:{n:"Role session (web identity)",sig:"AWS STS",tone:"emerald",who:()=>["p","you + team role"],key:["session","source_identity","subject","provider","session_tags"],
+    p:["STS takes your Okta token as the credential (AssumeRoleWithWebIdentity); an IAM OIDC provider trusts Okta.","IAM is the mapping: the team role admits the token only if its team tag is that role's team.","The session carries you: source identity = your login, session tags team + user."],
+    ex:()=>({iss:"https://identitycenter.amazonaws.com/ssoins-…",sub:V.idcUser()})},
+  aws:{n:"AWS JWT",sig:"AWS STS",tone:"orange",who:()=>["p","you + team role"],
+    key:["sub",[NS_STS,"source_identity"],[NS_STS,"principal_tags"],[NS_STS,"federated_provider"],"aud","exp"],
+    p:["STS signs it for your session of the team role (GetWebIdentityToken, 15 min).","<code>sub</code> = the team role (what OpenAI maps) · <code>source_identity</code> + <code>principal_tags.user</code> = you.","CloudTrail records your source identity on every call."],
+    ex:()=>({sub:V.teamRole(),aud:"https://api.openai.com/v1",[NS_STS]:{source_identity:V.user(),principal_tags:{team:V.team(),user:V.user()}}})},
+  oai:{n:"OpenAI token",sig:"OpenAI",tone:"teal",who:()=>["t","team only"],key:["sub",[NS_OAI,"wif_external_subject"],[NS_OAI,"project_id"],[NS_OAI,"wif_federation_rule_id"],"exp"],
+    p:["OpenAI issues it for the team's service account (Bearer, about 15 min).","<code>sub</code> = the service account · <code>wif_external_subject</code> = the team role.","It does <b>not</b> name you: OpenAI attributes the call to the team."],
+    ex:()=>({sub:V.sa(V.team()),[NS_OAI]:{wif_external_subject:V.teamRole(),wif_service_account_id:V.sa(V.team())}})},
+};
+const TFLOW={
+  gw:[{n:"you",k:"person",t:"You",s:"sign in with Okta",tone:"zinc",i:"user"},
+    {e:"you_agent",tok:["okta"],l:"invoke"},
+    {n:"agent",k:"agent",t:"Agent",s:"AgentCore Runtime + Identity",tone:"blue",i:"bot",side:[{id:"agent_okta",k:"okta",t:"Okta",s:"Cross App Access",tone:"violet",i:"key-round",send:["idt"],get:["gwt"]}]},
+    {e:"agent_gw",tok:["gwt"],l:"Bearer + X-Person-Token"},
+    {n:"gateway",k:"gateway",t:"AgentCore Gateway",s:"Cedar: your group's models only",tone:"orange",i:"door-open"},
+    {e:"gw_tr",tok:["sigv4","gwt"],l:"signed call + header"},
+    {n:"tr",k:"translator",t:"Translator",s:"one Lambda · no AWS permission needed",tone:"amber",i:"shuffle",side:[
+      {id:"tr_aws",k:"idc",t:"AWS STS",s:"web identity",tone:"emerald",i:"fingerprint",send:["gwt"],via:"idc",get:["aws"]},
+      {id:"tr_oauth",k:"openai",t:"OpenAI auth",s:"token exchange",tone:"teal",i:"repeat",send:["aws"],get:["oai"]}]},
+    {e:"tr_model",tok:["oai"],l:"Bearer"},
+    {n:"model",k:"openai",t:"OpenAI model",s:"api.openai.com",tone:"teal",i:"sparkles"}],
+  direct:[{n:"you",k:"person",t:"You",s:"sign in with Okta",tone:"zinc",i:"user"},
+    {e:"you_agent",tok:["okta"],l:"invoke"},
+    {n:"agent",k:"dagent",t:"Direct agent",s:"AgentCore Runtime · Strands + OpenAI SDK",tone:"blue",i:"zap",side:[
+      {id:"agent_aws",k:"didc",t:"AWS STS",s:"web identity",tone:"emerald",i:"fingerprint",send:["okta"],via:"idc",get:["aws"]},
+      {id:"agent_oauth",k:"dexchange",t:"OpenAI auth",s:"the SDK's token exchange",tone:"teal",i:"repeat",send:["aws"],get:["oai"]}]},
+    {e:"agent_model",tok:["oai"],l:"Bearer"},
+    {n:"model",k:"dmodel",t:"OpenAI model",s:"api.openai.com",tone:"teal",i:"sparkles"}]};
+const TFTOK={gw:["okta","gwt","aws","oai"],direct:["okta","aws","oai"]};
+const tokClaims=(p,k)=>{ const c=TK[k]; const real=(TD[p]||{})[k]; return real?[real,true]:[c.ex(),false]; };
+function tokChip(p,k){ const T=TK[k], [c,real]=tokClaims(p,k), [kind,who]=T.who(c), [bg,tx]=TONE[T.tone];
+  const whoCls=kind==="p"?"text-emerald-700":kind==="t"?"text-zinc-500":"text-orange-700";
+  return `<button data-xnode="tok_${k}" title="signed by ${T.sig}${real?"":" · example values"}" class="xnode inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2 py-1 text-[12px] shadow-sm hover:border-blue-300">
+    <span class="flex h-4 w-4 items-center justify-center rounded ${bg} ${tx}"><i data-lucide="file-key" class="h-2.5 w-2.5"></i></span><span class="font-semibold text-zinc-900">${T.n}</span>
+    <span class="inline-flex items-center gap-0.5 ${whoCls}">${kind==="p"?'<i data-lucide="user-check" class="h-3 w-3"></i>':kind==="t"?'<i data-lucide="users" class="h-3 w-3"></i>':""}${esc(who)}</span></button>`; }
+function tfState(p,id){ const st=TFS[p]; return st[id]||(st._run?"pending":"idle"); }
+const tfCls=s=>s==="pending"?"opacity-35":s==="bad"?"ring-2 ring-rose-400":"";
+function tfNode(p,x){ const [bg,tx,rail]=TONE[x.tone], st=tfState(p,x.n);
+  return `<div data-xnode="${x.k}" class="xnode cursor-pointer rounded-xl border border-l-4 border-zinc-200 ${rail} bg-white p-2.5 shadow-sm transition ${tfCls(st)}"><div class="flex items-center gap-2.5"><div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${bg} ${tx}"><i data-lucide="${st==="bad"?"x-circle":x.i}" class="h-4 w-4"></i></div><div class="min-w-0"><div class="text-[13.5px] font-semibold leading-tight text-zinc-900">${x.t}</div><div class="text-[11.5px] leading-snug text-zinc-500">${x.s}</div></div>${st==="ok"?'<i data-lucide="check-circle-2" class="ml-auto h-4 w-4 shrink-0 text-emerald-500"></i>':""}</div></div>`; }
+function tfSide(p,sd){ const st=tfState(p,sd.id), [bg,tx]=TONE[sd.tone], arrow='<i data-lucide="arrow-right" class="h-3.5 w-3.5 shrink-0 text-zinc-300"></i>';
+  return `<div class="flex flex-wrap items-center gap-1.5 transition ${tfCls(st)}"><span class="font-mono text-[11px] text-zinc-400">⇄</span>
+    <button data-xnode="${sd.k}" class="xnode inline-flex items-center gap-1 rounded-full ${bg} ${tx} px-2 py-0.5 text-[11.5px] font-semibold"><i data-lucide="${st==="bad"?"x-circle":sd.i}" class="h-3 w-3"></i>${sd.t}</button>
+    ${sd.send.map(k=>tokChip(p,k)).join("")}${arrow}${sd.via?tokChip(p,sd.via)+arrow:""}${sd.get.map(k=>tokChip(p,k)).join("")}${st==="ok"?'<i data-lucide="check" class="h-3.5 w-3.5 text-emerald-500"></i>':""}</div>`; }
+function tfHtml(p){ const F=TFLOW[p];
+  const strip=TFTOK[p].map(k=>{ const [c]=tokClaims(p,k), [kind]=TK[k].who(c); return `<span class="inline-flex items-center gap-1 rounded-full ${kind==="p"?"bg-emerald-50 text-emerald-700":"bg-zinc-100 text-zinc-500"} px-2 py-0.5 text-[11px]"><i data-lucide="${kind==="p"?"user-check":"users"}" class="h-3 w-3"></i>${TK[k].n}</span>`; }).join('<i data-lucide="chevron-right" class="h-3 w-3 text-zinc-300"></i>');
+  let h=`<div class="mb-3 flex flex-wrap items-center gap-1"><span class="mr-1 text-[11px] font-semibold text-zinc-500">Carries you:</span>${strip}<span class="ml-1 text-[11px] text-zinc-400">(grey = team only)</span></div><div>`;
+  F.forEach(x=>{ if(x.n) h+=`<div class="w-[260px]">${tfNode(p,x)}</div>${x.side?`<div class="ml-6 mt-1.5 space-y-1.5 border-l-2 border-dashed border-zinc-200 pl-3">${x.side.map(sd=>tfSide(p,sd)).join("")}</div>`:""}`;
+    else { const st=tfState(p,x.e); h+=`<div class="flex items-center gap-2 py-1.5 transition ${tfCls(st)}"><div class="flex w-[40px] shrink-0 justify-center"><i data-lucide="arrow-down" class="h-5 w-5 ${st==="bad"?"text-rose-500":"text-zinc-300"}"></i></div>
+      <div class="flex flex-wrap items-center gap-1.5">${x.tok.map(k=>tokChip(p,k)).join('<span class="text-[11px] text-zinc-400">+</span>')}<span class="font-mono text-[10.5px] text-zinc-400">${x.l}</span>${st==="bad"?`<span class="rounded bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-700">refused</span>`:""}</div></div>`; } });
+  return h+`</div>`; }
+function renderTF(p){ const el=$(p==="gw"?"#tflow":"#dtflow"); if(el){ el.innerHTML=tfHtml(p); icons(); } }
+function tfSet(p,ids,state){ ids.forEach(id=>TFS[p][id]=state); TFS[p]._run=true; renderTF(p); }
+function tfReset(p){ TFS[p]={_run:true}; renderTF(p); }
+Object.keys(TK).forEach(k=>{ NODES["tok_"+k]={t:`${TK[k].n} · signed by ${TK[k].sig}`,i:"file-key",p:TK[k].p,r:()=>{ const p=pat(), [c,real]=tokClaims(p,k);
+  const rows=TK[k].key?TK[k].key.map(kk=>{ const v=pick(c,kk); return v===undefined?null:[Array.isArray(kk)?kk[1]:kk,v,["sub","act","team","groups","source_identity","session","session_tags","preferred_username","wif_external_subject"].includes(Array.isArray(kk)?kk[1]:kk)]; }).filter(Boolean):Object.entries(c).map(([a,b])=>[a,b,a==="signed_by"]);
+  return sec(real?"decoded · this run (claims only, never the token)":"example values · run once on Live for the real token")+kv(rows)+(TK[k].key?more("All claims",pre(c)):""); }}; });
+function tick(m){ $("#ticker").textContent=m; }
+function flowStatus(t,c){ $("#flow-status").className=`ml-auto inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-medium ${{amber:"text-amber-600",emerald:"text-emerald-600",rose:"text-rose-600"}[c]||"text-zinc-400"}`; $("#flow-status").textContent=t; }
+function flowReset(){ for(const k in IO) delete IO[k]; tfReset("gw"); }
+
+// ---------------- live: evidence panel (AWS's own records of who each OpenAI token was for) ----------------
+let EV=null, EV_SINCE=Date.now()/1000-1800, RUN_AT=0, EV_POLL=null;
+async function loadEvidence(){ try{ EV=await (await fetch(`/api/evidence?since=${EV_SINCE}`)).json(); }catch(_){ EV=null; } renderEvidence(); }
+function pollEvidence(){ clearInterval(EV_POLL); let n=0; loadEvidence();
+  EV_POLL=setInterval(()=>{ n++; loadEvidence(); const got=(EV?.cloudtrail||[]).some(r=>r.ts>=RUN_AT&&r.event==="GetWebIdentityToken"); if(got||n>=24) clearInterval(EV_POLL); },15000); }
+const CT_URL=id=>`https://us-east-1.console.aws.amazon.com/cloudtrailv2/home?region=us-east-1#/events/${encodeURIComponent(id)}`;
+const LOG_URL="https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#logsV2:log-groups/log-group/$252Faws$252Flambda$252Fopenai-wif-translator";
+function evWho(uid,name){ const me=uid&&uid===STATUS.user?.login;
+  return `<span class="inline-flex items-center gap-1 rounded-full ${me?"bg-emerald-50 text-emerald-700":"bg-zinc-100 text-zinc-700"} px-2 py-0.5 font-mono text-[11px]">${me?'<i data-lucide="check" class="h-3 w-3"></i>':""}${esc(name||(uid||"?").slice(0,13)+"…")}</span>`; }
+const evT=ts=>new Date(ts*1000).toLocaleTimeString(), evNew=ts=>RUN_AT&&ts>=RUN_AT?`<span class="rounded bg-blue-50 px-1 text-[10px] font-medium text-blue-700">this run</span>`:"";
+function renderEvidence(){ const gw=view!=="dlive", el=$(gw?"#evidence":"#devidence"); if(!el) return;
+  if(!EV){ el.innerHTML=`<div class="text-[13px] text-zinc-400">Loading…</div>`; return; }
+  const short=a=>(a||"").replace(/^arn:aws:sts::\d+:assumed-role\//,"");
+  const mints=EV.translator.filter(r=>r.event==="aws_jwt_minted"), calls=EV.translator.filter(r=>r.event==="call");
+  const tr=gw?`${sec("1 · translator log · CloudWatch Logs · seconds after the call")}
+    ${mints.length?`<div class="mt-1 space-y-1.5">${mints.slice(0,4).map(r=>`<div class="rounded-lg border border-zinc-200 p-2 text-[12px]"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-zinc-400">${evT(r.ts)}</span>${evNew(r.ts)}<span class="text-zinc-600">AWS JWT minted for</span>${evWho(r.source_identity,r.user||r.source_identity)}<span class="rounded-full bg-teal-50 px-2 py-0.5 text-[10.5px] text-teal-700">${esc(r.team)}</span></div>
+        <div class="mt-1 font-mono text-[11px] text-zinc-500">sub ${esc((r.sub||"").split("/").pop())} · source_identity ${esc(r.source_identity)} · jti ${esc((r.jti||"").slice(0,8))}… · ${(r.exp-r.iat)/60} min</div></div>`).join("")}</div>`
+      :`<div class="mt-1 text-[12px] text-zinc-400">No AWS JWT minted in this window${calls.length?" (the translator reused a cached OpenAI token)":""}.</div>`}
+    ${calls.length?more(`Translator calls (${calls.length})`,`<table class="w-full text-[11px]">${calls.slice(0,10).map(r=>`<tr class="border-t border-zinc-100"><td class="py-1 font-mono">${evT(r.ts)}</td><td>${evWho(r.person,r.user)}</td><td class="font-mono">${esc(r.path)}</td><td class="font-mono text-zinc-500">OpenAI token ${esc(r.openai_token)}</td></tr>`).join("")}</table>`):""}`:"";
+  const ct=EV.cloudtrail, waiting=RUN_AT&&!ct.some(r=>r.ts>=RUN_AT&&r.event==="GetWebIdentityToken");
+  const ctHtml=`${sec(`${gw?"2":"1"} · CloudTrail · AWS's audit record · usually 1–5 minutes after the call`)}
+    ${waiting?`<div class="mt-1 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-[12px] text-amber-800"><i data-lucide="loader" class="h-3.5 w-3.5 animate-spin"></i>Waiting for this run's events to reach CloudTrail (checking every 15 s)…</div>`:""}
+    ${ct.length?`<div class="mt-1 space-y-1.5">${ct.slice(0,6).map(r=>`<div class="rounded-lg border border-zinc-200 p-2 text-[12px]"><div class="flex flex-wrap items-center gap-2"><span class="font-mono text-zinc-400">${evT(r.ts)}</span>${evNew(r.ts)}<span class="font-mono font-semibold text-zinc-800">${esc(r.event)}</span><span class="text-zinc-500">for</span>${evWho(r.user_id,r.user)}
+        <a href="${CT_URL(r.event_id)}" target="_blank" class="ml-auto inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline">open in CloudTrail <i data-lucide="external-link" class="h-3 w-3"></i></a></div>
+        <div class="mt-1 font-mono text-[11px] text-zinc-500">${esc(r.field)} · caller ${esc(short(r.caller))}</div></div>`).join("")}</div>`
+      :`<div class="mt-1 text-[12px] text-zinc-400">No events in this window yet.</div>`}`;
+  el.innerHTML=`<div class="text-[12.5px] text-zinc-600">${gw?"Two independent AWS records name the person":"CloudTrail names the person"} each OpenAI token was minted for. A green name is you.</div>${tr}${ctHtml}
+    <div class="mt-3 flex flex-wrap gap-3 text-[11.5px]">${gw?`<a href="${LOG_URL}" target="_blank" class="text-blue-600 hover:underline">translator logs ↗</a>`:""}<a href="https://us-east-1.console.aws.amazon.com/cloudtrailv2/home?region=us-east-1#/events?EventName=GetWebIdentityToken" target="_blank" class="text-blue-600 hover:underline">CloudTrail · GetWebIdentityToken ↗</a><a href="https://us-east-1.console.aws.amazon.com/cloudtrailv2/home?region=us-east-1#/events?EventName=AssumeRoleWithWebIdentity" target="_blank" class="text-blue-600 hover:underline">CloudTrail · AssumeRoleWithWebIdentity ↗</a></div>
+    ${EV.cloudtrail_error||EV.translator_error?`<div class="mt-2 text-[11px] text-rose-600">${esc(EV.cloudtrail_error||EV.translator_error)}</div>`:""}`; icons(); }
+
+// ---------------- live: left pane ----------------
+const GUARDS=[{k:"guard_direct",t:"Your own token, no agent",i:"user-x",who:"Gateway"},{k:"guard_forged",t:"Forged Okta token",i:"file-x",who:"AgentCore Runtime"}];
+const PROMPTS=["What is 17 × 23, and what's today's date?","What is 12.5% of 840?","In one sentence, who am I and how did my request reach you?"];
+function renderLive(){ const s=STATUS, u=s.user, gate=s.runtime?.status!=="READY"?"Deploy first (Deploy screen).":!u?"Sign in with Okta first (top right).":"";
+  $("#live-pending").className=gate?"rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900/80":"hidden"; $("#live-pending").innerHTML=gate?`<b class="text-amber-800">Not ready.</b> ${gate}`:"";
+  $("#who-card").innerHTML=u?`<div class="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50/50 p-3"><div class="flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-sm font-bold text-white">${esc(u.login[0].toUpperCase())}</div>
+      <div class="min-w-0 flex-1"><div class="truncate font-mono text-[13px] text-zinc-900">${esc(u.login)}</div><div class="text-[12px] text-zinc-500">group <b class="font-mono text-zinc-800">${esc(V.group())}</b></div></div>
+      <a href="/logout" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50">Switch person</a></div>`
+    :`<a href="/login" class="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/40 p-4 text-sm font-medium text-violet-700 hover:bg-violet-50 ${s.okta?.configured?"":"pointer-events-none opacity-40"}"><i data-lucide="key-round" class="h-4 w-4"></i> Sign in with Okta · Ada (engineering) or Grace (finance)</a>`;
+  $("#ask").innerHTML=askHtml("gw",gate);
+  $("#btn-send").disabled=!!gate||BUSY; if(!$("#tflow").innerHTML) renderTF("gw"); $("#bundles").innerHTML=bundlesHtml("gw",gate); renderEvidence(); icons(); }
+function bubble(html,who){ if(who==="step") return; const c=$("#chat"); c.insertAdjacentHTML("beforeend",who==="you"?`<div class="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-zinc-900 px-3.5 py-2 text-[14px] text-white">${html}</div>`
+  :who==="bad"?`<div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-rose-200 bg-rose-50 px-3.5 py-2 text-[14px] text-rose-800">${html}</div>`:who==="step"?`<div class="flex items-start gap-2 text-[12.5px] text-zinc-600">${html}</div>`:`<div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-zinc-200 bg-white px-3.5 py-2 text-[14px] text-zinc-800 shadow-sm">${html}</div>`); c.scrollTop=c.scrollHeight; icons(); }
+const stepLine=(ok,t,ms)=>`<i data-lucide="${ok?"check-circle-2":"x-circle"}" class="mt-0.5 h-4 w-4 shrink-0 ${ok?"text-emerald-600":"text-rose-600"}"></i><span>${t}${ms!=null?` <span class="font-mono text-zinc-400">· ${ms} ms</span>`:""}</span>`;
+
+// ---------------- running ----------------
+const Q=[]; let qBusy=false; function enq(fn,d=380){ Q.push([fn,d]); if(!qBusy) pump(); } function pump(){ const it=Q.shift(); if(!it){qBusy=false;return;} qBusy=true; it[0](); setTimeout(pump,it[1]); }
+async function stream(key,body,onEv){ BUSY=true; (view==="dlive"?renderDLive:renderLive)();
+  try{ const r=await fetch(`/api/run/${key}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); const rd=r.body.getReader(), dec=new TextDecoder(); let buf="";
+    for(;;){ const {done,value}=await rd.read(); if(done) break; buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ const l=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(l) onEv(JSON.parse(l)); } }
+  }catch(e){ onEv({kind:"error",text:String(e.message||e)}); onEv({kind:"done"}); } }
+function start(label){ flowReset(); tfSet("gw",["you"],"ok"); flowStatus("running","amber"); tick(label); }
+const isBad=s=>s==="denied"||(typeof s==="number"&&s>=400);
+function hop(e){ const bad=isBad(e.status), T=(ids,st)=>tfSet("gw",ids,st);
+  if(e.edge==="agent"){ if(e.status==="sending") return; if(bad){ T(["you_agent","agent"],"bad"); bubble(stepLine(false,`AgentCore Runtime refused the Okta token (HTTP ${e.status})`,e.ms),"step"); tick(`Runtime · HTTP ${e.status}`); } else T(["you_agent","agent"],"ok"); }
+  else if(e.edge==="step1"){ if(bad){ T(["agent_okta"],"bad"); bubble(stepLine(false,"The agent refused to act: the id_token isn't the caller's"),"step"); return; } bubble(stepLine(true,"Agent → Okta: id_token → ID-JAG (act = this agent)",e.ms),"step"); tick("ID-JAG"); }
+  else if(e.edge==="step2"){ T(["agent_okta"],"ok"); bubble(stepLine(true,"Okta → Agent: Gateway token (sub = you, act = agent, team)",e.ms),"step"); tick("Gateway token"); }
+  else if(e.edge==="gateway"){ if(bad){ T(["agent_gw"],"ok"); T(["gateway"],"bad"); bubble(stepLine(false,`Gateway refused (HTTP ${e.status}): Cedar, your group can't use that model`,e.ms),"step"); tick(`Gateway · ${e.status} · Cedar`); }
+    else { T(["agent_gw","gateway","gw_tr","tr"],"ok"); bubble(stepLine(true,"Gateway: token ok · Cedar permit · IAM-signed call + X-Person-Token to the translator",e.ms),"step"); } }
+  else if(e.edge==="openai"&&bad){ T(["tr_aws","tr_oauth","tr_model"],"ok"); T(["model"],"bad"); bubble(stepLine(false,`OpenAI refused ${esc(e.model||"the model")} (HTTP ${e.status}): the team's project doesn't allow it`),"step"); tick(`OpenAI · ${e.status}`); }
+  else if(e.edge==="openai"){ T(["tr_aws","tr_oauth","tr_model","model"],"ok");
+    bubble(stepLine(true,`Translator: your Gateway token → STS web identity (IAM admitted team ${esc(V.team())}) → AWS JWT naming you → OpenAI token for the team`),"step"); tick("OpenAI · 200"); }
+  else if(e.edge==="direct"){ if(e.status==="sending"){ flowReset(); T(["you"],"ok"); return; } T(["agent_gw"],"ok"); T(["gateway"],bad?"bad":"ok"); bubble(stepLine(!bad,`Gateway answered HTTP ${e.status} to your own (undelegated) sign-in token`),"step"); }
+}
+function fillIO(d){ const tr=d.trace||{}, x=d.translator||{}; LAST=d;
+  if(d.ok) TD.gw={okta:CLAIMS?.access_token, idt:CLAIMS?.id_token, gwt:tr.step2?.gateway_token, idc:x.web_identity, aws:x.aws_jwt, oai:x.openai_token,
+    sigv4:x.call?{signed_by:x.call.sigv4_caller, service:"lambda · Function URL (AWS_IAM)", "X-Person-Token":x.call.person_token}:null};
+  renderTF("gw");
+  if(tr.inbound) IO.agent=[{label:"inbound (validated by AgentCore Runtime)",in:{access_token:tr.inbound,id_token:tr.id_token},out:{binding_check:"id_token sub = uid · aud = this agent"}}];
+  if(tr.step1) IO.step1=[{label:`GetResourceOauth2Token · ${tr.step1.ms} ms`,in:tr.step1.request,out:{id_jag:tr.step1.id_jag}}];
+  if(tr.step2) IO.step2=[{label:`GetResourceOauth2Token · ${tr.step2.ms} ms`,in:tr.step2.request,out:{gateway_token:tr.step2.gateway_token}}];
+  if(tr.model) IO.gateway=[{label:tr.model.error?"refused":"POST /inference/v1/chat/completions",bad:!!tr.model.error,in:{model:tr.model.model_id,bearer:"<Gateway token: sub · act · team>",gateway:tr.model.gateway},out:tr.model.error?{error:tr.model.error}:{usage:tr.model.usage,tools_used:tr.model.tools_used,ms:tr.model.ms}}];
+  if(tr.model&&!tr.model.error&&d.team){ IO.translator=[{label:`path /${d.team}`,in:{from:"AgentCore Gateway (SigV4, GATEWAY_IAM_ROLE)",path:`/${d.team}/v1/chat/completions`},out:{source_identity:STATUS.user?.login,assumed:`OpenAIWifGateway${cap(d.team)}Role (as you)`,openai_service_account:V.sa(d.team),token:"short-lived, per person, in memory"}}];
+    IO.idc=[{label:"AssumeRoleWithWebIdentity",in:{RoleArn:V.teamRole(d.team),WebIdentityToken:"<your delegated Gateway token>"},out:d.translator?.web_identity||{source_identity:STATUS.user?.login}}];
+    IO.openai=[{label:"answer",in:{model:tr.model.model_id},out:{answer:d.answer}}]; }
+  if(_panel) openNodePanel(_panel); }
+function onResult(d,label){ fillIO(d); setTimeout(()=>testVerdict("gw",d),50);
+  if(d.ok){ bubble(`<div class="whitespace-pre-line">${esc(d.answer)}</div>`); flowStatus("done","emerald"); tick(`done · ${d.person} → ${d.trace?.model?.model_id}`); }
+  else { bubble(refusal("gw",d),"bad"); flowStatus("refused","rose"); }
+  pollEvidence(); }
+let MODEL_SEL=null, CUR_TEST=null, MORE=false; const TRES={gw:{},direct:{}}, BSEL={gw:null,direct:null}, LASTM={gw:null,direct:null};
+const BORDER=["gpt-5.6-terra","gpt-5.6-luna","gpt-5.6-sol"], ASK=["What is 17 × 23?","What's today's date?"];
+const bname=m=>STATUS.bundles?.[m]?.name||m;
+const bsel=p=>BSEL[p]||V.openaiAllowed()[0]||BORDER[0];
+function refusal(p,d){ const m=LASTM[p]||"the model", o=outcomeOf(d);
+  return o==="cedar"?`Refused at the Gateway (Cedar): ${esc(m)} isn't allowed for ${esc(V.group())}.`:o==="openai"?`Refused by OpenAI: the ${esc(V.team())} project doesn't allow ${esc(m)}.`
+    :esc(String(d.error||d.response?.error?.message||`HTTP ${d.http||"?"}`).slice(0,160)); }
+function bundlesHtml(p,gate){ if(!STATUS.user) return ""; const T=tests(p), yes='<span class="text-emerald-600">✓</span>', no='<span class="text-rose-600">✕</span>', na='<span class="text-zinc-300">—</span>';
+  const tag={answer:["answers","bg-emerald-50 text-emerald-700"],openai:["OpenAI refuses","bg-rose-50 text-rose-700"],cedar:["Gateway refuses","bg-rose-50 text-rose-700"]};
+  const cards=BORDER.filter(m=>V.models().includes(m)||STATUS.bundles?.[m]).map(m=>{ const t=T.find(x=>x.m===m)||{m,cedar:p==="gw"?false:null,openai:false,expect:p==="gw"?"cedar":"openai"}, r=TRES[p][m], sel=bsel(p)===m, [lab,cls]=tag[t.expect];
+    return `<button onclick="pickBundle('${p}','${m}')" ${gate||BUSY?"disabled":""} class="rounded-xl ${sel?"border-2 border-zinc-900":"border border-zinc-200 hover:border-zinc-400"} bg-white p-2.5 text-left disabled:opacity-60">
+      <div class="font-mono text-[11px] text-zinc-500">${esc(bname(m))}</div><div class="text-[13.5px] font-semibold text-zinc-900">${esc(m)}</div>
+      <div class="mt-1 text-[12px] text-zinc-600">${p==="gw"?`Cedar ${t.cedar?yes:no} · `:""}OpenAI ${t.cedar===false?na:t.openai?yes:no}</div>
+      <div class="mt-1.5 flex flex-wrap items-center gap-1"><span class="rounded px-1.5 py-0.5 text-[11px] font-medium ${cls}">${lab}</span>${r?`<span class="text-[11px] ${r.match?"text-emerald-700":"text-amber-700"}" title="${esc(OUT[r.outcome][0])}">${r.match?"✓ as expected":"≠ "+esc(OUT[r.outcome][0])}</span>`:""}</div></button>`; }).join("");
+  const miss=Object.values(TRES[p]).some(r=>!r.match&&r.outcome==="answer")?` OpenAI answered a model it should refuse: set the project's model limit in the OpenAI dashboard.`:"";
+  return `<div><div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">1 · Configuration bundle (sets the agent's model)</div><div class="grid grid-cols-3 gap-2">${cards}</div>
+    <div class="mt-1.5 text-[11px] text-zinc-400">Ticks are for ${esc(V.group())}.${p==="gw"?" Cedar = the Gateway's models for your group · OpenAI = your team project's model limit.":" No Gateway on this path, so no Cedar: only your team project's model limit."}${miss}</div></div>`; }
+function askHtml(p,gate){ if(!STATUS.user) return ""; const dis=gate||BUSY?"disabled":"";
+  const chips=ASK.map((q,i)=>`<button onclick="askQ('${p}',${i})" ${dis} class="rounded-full border border-zinc-200 bg-white px-3 py-1 text-[12.5px] text-zinc-700 hover:bg-zinc-50 disabled:opacity-40">${esc(q)}</button>`).join("");
+  const more=p!=="gw"?"":`<div class="mt-2"><button onclick="MORE=!MORE;renderLive()" class="text-[12px] text-blue-600 hover:underline">More checks: your own token, no agent · forged Okta token ${MORE?"‹":"›"}</button>
+    ${MORE?`<div class="mt-1.5 flex flex-wrap gap-2">${GUARDS.map(g=>`<button onclick="runGuard('${g.k}')" ${dis} class="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-white px-3 py-1 text-[12.5px] font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-40"><i data-lucide="${g.i}" class="h-3.5 w-3.5"></i>${g.t}</button>`).join("")}</div>`:""}</div>`;
+  return `<div><div class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">2 · Ask</div><div class="flex flex-wrap gap-2">${chips}</div>${more}</div>`; }
+function pickBundle(p,m){ BSEL[p]=m; p==="gw"?renderLive():renderDLive(); }
+function askQ(p,i){ p==="gw"?send(ASK[i]):dsend(ASK[i]); }
+function runBody(p,prompt,model){ LASTM[p]=model; const t=tests(p).find(x=>x.m===model); CUR_TEST=t?{p,t}:null;
+  return STATUS.bundles?.[model]?{prompt,bundle:model}:{prompt,model}; }
+const youTag=m=>` <span class="ml-1 rounded bg-white/15 px-1 font-mono text-[11px]">${esc(STATUS.bundles?.[m]?bname(m):"openai/"+m)}</span>`;
+function tests(p){ const al=V.allowed(), oa=V.openaiAllowed(), third=V.models().find(m=>!al.includes(m));
+  const rows=[al[0],al[1],third].filter(Boolean).map(m=>({m, cedar:p==="gw"?al.includes(m):null, openai:oa.includes(m)}));
+  rows.forEach(r=>r.expect=r.cedar===false?"cedar":r.openai?"answer":"openai"); return rows; }
+const OUT={answer:["answered","text-emerald-700"],cedar:["Cedar refused (Gateway 403)","text-rose-700"],openai:["OpenAI refused","text-rose-700"],error:["error","text-amber-700"]};
+function testsHtml(p){ const u=STATUS.user; if(!u) return ""; const yes='<span class="text-emerald-600">✓</span>', no='<span class="text-rose-600">✕</span>', na='<span class="text-zinc-300">—</span>';
+  return `<div class="rounded-xl border border-zinc-200 p-3"><div class="flex items-center gap-2"><i data-lucide="flask-conical" class="h-4 w-4 text-blue-600"></i><span class="text-[12.5px] font-semibold text-zinc-900">Test the controls</span><span class="text-[11px] text-zinc-400">as ${esc(V.group())}${p==="direct"?" · no Gateway, so no Cedar":""}</span></div>
+    <table class="mt-2 w-full text-[12px]"><tr class="text-left text-[10.5px] text-zinc-400"><th></th><th class="font-medium">model</th><th class="font-medium">Cedar</th><th class="font-medium">OpenAI</th><th class="font-medium">expect</th><th class="font-medium">result</th></tr>
+    ${tests(p).map((t,i)=>{ const r=TRES[p][t.m]; return `<tr class="border-t border-zinc-100"><td class="py-1.5 pr-2"><button onclick="runTest('${p}',${i})" ${BUSY?"disabled":""} class="rounded-md bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-zinc-700 disabled:opacity-40">Try ${["1st","2nd","3rd"][i]}</button></td>
+      <td class="font-mono text-[11.5px] text-zinc-800">${t.m}</td><td>${t.cedar===null?na:t.cedar?yes:no}</td><td>${t.cedar===false?na:t.openai?yes:no}</td><td class="text-zinc-600">${OUT[t.expect][0]}</td>
+      <td>${r?`<span class="${r.match?"text-emerald-700":"text-amber-700"}">${r.match?"✓":"≠"} ${esc(OUT[r.outcome][0])}</span>`:'<span class="text-zinc-300">not run</span>'}</td></tr>`; }).join("")}</table>
+    <div class="mt-1.5 text-[10.5px] text-zinc-400">Cedar: your Okta group's models at the Gateway · OpenAI: the team project's model limit (engineering → gpt-5.6-sol, finance → gpt-5.6-terra)</div></div>`; }
+function outcomeOf(d){ const e=String(d.error||""); return d.ok?"answer":/policy enforcement/.test(e)?"cedar":/Error code: (403|404)/.test(e)?"openai":"error"; }
+function testVerdict(p,d){ if(!CUR_TEST||CUR_TEST.p!==p) return; const t=CUR_TEST.t, o=outcomeOf(d), match=o===t.expect; TRES[p][t.m]={outcome:o,match}; CUR_TEST=null;
+  const why=o==="cedar"?`Cedar refused ${t.m}: not in ${V.group()}'s Gateway list`:o==="openai"?`OpenAI refused ${t.m}: the ${V.team()} project doesn't allow it`:o==="answer"?`Cedar${p==="gw"?" and OpenAI both":" n/a; OpenAI"} allowed ${t.m}`:"something else failed";
+  const hint=!match&&t.expect==="openai"&&o==="answer"?" · OpenAI hasn't blocked it yet: set the project's model limit in the OpenAI dashboard":"";
+  (p==="gw"?bubble:dbubble)(`<div class="flex items-start gap-2 text-[12.5px] ${match?"text-emerald-800":"text-amber-800"}"><i data-lucide="${match?"badge-check":"alert-triangle"}" class="mt-0.5 h-4 w-4 shrink-0"></i><span><b>${match?"As expected":"Not as expected"}</b>: ${esc(why)}${esc(hint)}</span></div>`,"step");
+  p==="gw"?renderLive():renderDLive(); }
+function runTest(p,i){ if(BUSY) return; const t=tests(p)[i]; CUR_TEST={p,t}; const q=`In one short sentence: which model are you? (test ${i+1})`;
+  if(p==="gw") send(q,t.m); else dsend(q,t.m); }
+function send(qArg,mArg){ const typed=typeof qArg!=="string", prompt=typed?$("#chat-input").value.trim():qArg; if(!prompt||BUSY) return; if(typed) $("#chat-input").value="";
+  const model=(typeof mArg==="string"&&mArg)||bsel("gw"), body=runBody("gw",prompt,model);
+  bubble(esc(prompt)+youTag(model),"you"); RUN_AT=Date.now()/1000-2; start(`asking the agent · ${bname(model)}…`);
+  stream("chat",body,ev=>{ if(ev.kind==="hop") enq(()=>hop(ev)); else if(ev.kind==="result") enq(()=>onResult(ev.data)); else if(ev.kind==="error") enq(()=>{ bubble(`<div class="text-[13px] text-rose-800">${esc(ev.text)}</div>`); flowStatus("error","rose"); }); else if(ev.kind==="done") enq(()=>{ BUSY=false; renderLive(); },10); }); }
+function usePrompt(i){ $("#chat-input").value=PROMPTS[i]; send(); }
+function runGuard(k){ if(BUSY) return; const g=GUARDS.find(x=>x.k===k); bubble(`Try: ${esc(g.t)}`,"you"); if(k!=="guard_direct") start(`guardrail: ${g.t}…`);
+  stream(k,{},ev=>{ if(ev.kind==="hop") enq(()=>hop(ev)); else if(ev.kind==="result") enq(()=>{ const d=ev.data;
+      if(k==="guard_team") onResult(d,`${g.who} refused`); else { const ok=d.http===200; bubble(`<div class="mb-1 text-[11px] font-semibold uppercase tracking-wide ${ok?"text-amber-600":"text-rose-600"}">${ok?"let through: check config":g.who+" refused, as it should"} · HTTP ${d.http}</div>${d.sent?kv(Object.entries(d.sent.claims).map(([a,b])=>[a,b])):""}<div class="mt-1 break-words font-mono text-[12px] text-zinc-600">${esc(JSON.stringify(d.response).slice(0,220))}</div>`); flowStatus(ok?"let through":"refused ✓","rose"); } });
+    else if(ev.kind==="error") enq(()=>bubble(`<div class="text-[13px] text-rose-800">${esc(ev.text)}</div>`)); else if(ev.kind==="done") enq(()=>{ BUSY=false; renderLive(); },10); }); }
+$("#btn-send").onclick=send; $("#chat-input").addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) send(); });
+
+// ---------------- Direct pattern ----------------
+Object.assign(NODES,{
+  dagent:{t:"Direct agent · Strands on AgentCore Runtime",i:"zap",p:["Same Okta inbound as the Gateway agent.","It hands your Okta token to STS as your web identity and builds an OpenAI client for that session (one per person, cached per sign-in).","Its own role needs no AWS permission for this and can't mint OpenAI tokens."],
+    r:()=>STATUS.direct?sec("deployed")+kv([["runtime",STATUS.direct.id,1],["execution role",STATUS.direct.role]]):""},
+  didc:{t:"AWS STS · web identity · your session",i:"fingerprint",p:["AssumeRoleWithWebIdentity: your Okta access token is the credential (IAM OIDC provider = Okta's sign-in server).","The team role admits it only if its team tag is that role's team.","The session carries you: source identity = your login."],
+    r:()=>sec("your session")+kv([["source identity",V.user(),1],["session tags",`team = ${V.team()} · user = ${V.user()}`,1],["→ team role",V.teamRole(),1]])},
+  dsts:{t:"AWS STS · GetWebIdentityToken (as you)",i:"stamp",p:["Called by the SDK through a small token function bound to your session.","sub = the team role, source_identity + principal_tags.user = you.","IAM: only aud = OpenAI, at most 1 hour."],r:()=>sec("caller")+pre(`${V.teamRole()} · session person-${V.idcUser().slice(0,24)}`)},
+  dexchange:{t:"OpenAI token exchange",i:"repeat",p:["The SDK posts the AWS JWT to auth.openai.com/oauth/token.","OpenAI maps the team role to the team's service account (the same mappings as the Gateway pattern).","The SDK caches the token and refreshes it before expiry."],r:()=>sec("mapping")+kv([["sub",V.teamRole(),1],["→ service account",V.sa(V.team()),1]])},
+  dmodel:{t:"OpenAI model · api.openai.com",i:"sparkles",p:["Called directly, no Gateway in between.","No Cedar rule.","Evidence of the person: CloudTrail (onBehalfOf on GetWebIdentityToken)."],r:()=>""},
+});
+const DIO={};
+function renderDArch(){ const tab=(k,t)=>`<button onclick="darchTab('${k}')" class="rounded-lg px-3 py-1.5 text-sm font-medium ${DARCHTAB===k?"bg-zinc-900 text-white":"text-zinc-600 hover:bg-zinc-100"}">${t}</button>`;
+  $("#darch-tabs").innerHTML=tab("p1","Part 1 · Identity setup")+tab("p2","Part 2 · How identity propagates")+tab("p3","Part 3 · Components");
+  $("#darch-p1").classList.toggle("hidden",DARCHTAB!=="p1"); $("#darch-p2").classList.toggle("hidden",DARCHTAB!=="p2"); $("#darch-p3").classList.toggle("hidden",DARCHTAB!=="p3");
+  if(DARCHTAB==="p1"){ renderP1("direct"); return; }
+  if(DARCHTAB==="p3"){ renderP3("direct"); return; }
+  renderMap("direct"); }
+const DPROMPTS=["What is 19 × 21? Use the calculator.","And plus 1?","What's the date today?"];
+function renderDLive(){ const s=STATUS, u=s.user, gate=s.direct?.status!=="READY"?"Deploy the direct agent first (agent_direct_deploy.py up).":!u?"Sign in with Okta first (top right).":"";
+  $("#dlive-pending").className=gate?"rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900/80":"hidden"; $("#dlive-pending").innerHTML=gate?`<b class="text-amber-800">Not ready.</b> ${gate}`:"";
+  $("#dwho-card").innerHTML=u?`<div class="flex items-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3"><div class="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-700 text-sm font-bold text-white">${esc(u.login[0].toUpperCase())}</div>
+      <div class="min-w-0 flex-1"><div class="truncate font-mono text-[13px] text-zinc-900">${esc(u.login)}</div><div class="text-[12px] text-zinc-500">group <b class="font-mono text-zinc-800">${esc(V.group())}</b></div></div>
+      <a href="/logout" class="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50">Switch person</a></div>`:`<a href="/login" class="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/40 p-4 text-sm font-medium text-violet-700 hover:bg-violet-50"><i data-lucide="key-round" class="h-4 w-4"></i> Sign in with Okta</a>`;
+  $("#dask").innerHTML=askHtml("direct",gate);
+  $("#dbtn-send").disabled=!!gate||BUSY; if(!$("#dtflow").innerHTML) renderTF("direct"); $("#dbundles").innerHTML=bundlesHtml("direct",gate); renderEvidence();
+  $("#dcompare").innerHTML=`<div class="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Gateway pattern vs Direct</div><table class="mt-2 w-full text-[12.5px]"><tr class="text-left text-[11px] text-zinc-400"><th class="py-1 font-medium"></th><th class="font-medium">Gateway pattern</th><th class="font-medium">Direct</th></tr>
+    ${[["AWS JWT names","you + your team role","you + your team role"],["OpenAI token names","team service account","team service account"],["Team chosen by","Okta group (Cedar models + IAM role trust)","Okta group (IAM role trust)"],["Evidence of the person","CloudTrail + translator log","CloudTrail"],["Team rule (Cedar)","yes","no"],["OpenAI key stored","none","none"],["Who swaps IAM → token","translator Lambda","OpenAI SDK in the agent"]]
+      .map(([k,a,b])=>`<tr class="border-t border-zinc-100"><td class="py-1.5 text-zinc-500">${k}</td><td class="font-medium text-zinc-800">${a}</td><td class="font-medium text-zinc-800">${b}</td></tr>`).join("")}</table>`; icons(); }
+function dbubble(html,who){ if(who==="step") return; const c=$("#dchat"); c.insertAdjacentHTML("beforeend",who==="you"?`<div class="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-zinc-900 px-3.5 py-2 text-[14px] text-white">${html}</div>`:who==="bad"?`<div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-rose-200 bg-rose-50 px-3.5 py-2 text-[14px] text-rose-800">${html}</div>`:who==="step"?`<div class="flex items-start gap-2 text-[12.5px] text-zinc-600">${html}</div>`:`<div class="max-w-[92%] rounded-2xl rounded-bl-sm border border-zinc-200 bg-white px-3.5 py-2 text-[14px] text-zinc-800 shadow-sm">${html}</div>`); c.scrollTop=c.scrollHeight; icons(); }
+function dsend(qArg,mArg){ const typed=typeof qArg!=="string", prompt=typed?$("#dchat-input").value.trim():qArg; if(!prompt||BUSY) return; if(typed) $("#dchat-input").value="";
+  const model=(typeof mArg==="string"&&mArg)||bsel("direct"), body=runBody("direct",prompt,model); dbubble(esc(prompt)+youTag(model),"you"); RUN_AT=Date.now()/1000-2;
+  tfReset("direct"); tfSet("direct",["you"],"ok"); $("#dflow-status").textContent="running"; $("#dticker").textContent="asking the direct agent…"; for(const k in DIO) delete DIO[k];
+  stream("direct",body,ev=>{
+    if(ev.kind==="hop") enq(()=>{ const e=ev, bad=isBad(e.status);
+      const T=(ids,st)=>tfSet("direct",ids,st);
+      if(e.edge==="agent"&&e.status!=="sending"){ T(["you_agent","agent"],bad?"bad":"ok"); if(bad) dbubble(stepLine(false,`Runtime refused (HTTP ${e.status})`),"step"); }
+      if(e.edge==="webid"){ T(["agent_aws"],bad?"bad":"ok"); dbubble(stepLine(!bad,bad?"STS refused your token (no team tag, or not this role's team)":e.status==="reused"?`STS: your ${esc(e.team)} session, reused from this sign-in`:`STS: your Okta token → your session of the ${esc(e.team)} role (web identity; IAM checked the team tag)`,e.ms),"step"); }
+      if(e.edge==="sts"){ dbubble(stepLine(true,e.status==="reused"?"SDK reused its cached OpenAI token: no new AWS JWT needed":"SDK got an AWS JWT naming you (GetWebIdentityToken as your session)",e.ms),"step"); }
+      if(e.edge==="exchange"){ T(["agent_oauth"],bad?"bad":"ok"); if(bad) dbubble(stepLine(false,"OpenAI refused the exchange: check the team role's mapping"),"step"); }
+      if(e.edge==="model"&&bad){ T(["agent_model"],"ok"); T(["model"],"bad"); dbubble(stepLine(false,`OpenAI refused ${esc(e.model||"the model")} (HTTP ${e.status}): the team's project doesn't allow it`),"step"); }
+      else if(e.edge==="model"){ T(["agent_model","model"],"ok"); dbubble(stepLine(true,"OpenAI answered (straight from the agent, no Gateway)",e.ms),"step"); } });
+    else if(ev.kind==="result") enq(()=>{ const d=ev.data, tr=d.trace||{};
+      if(d.ok){ TD.direct={okta:CLAIMS?.access_token, idt:CLAIMS?.id_token, idc:tr.person?.web_identity, aws:tr.aws_jwt, oai:tr.openai_token?.unavailable?null:tr.openai_token}; renderTF("direct"); }
+      DIO.dagent=[{label:"inbound",in:{access_token:tr.inbound},out:{person:tr.person&&{team:tr.person.team,openai:tr.person.openai}}}];
+      if(tr.person) DIO.didc=[{label:tr.person.cached?"reused from this sign-in":`AssumeRoleWithWebIdentity · ${tr.person.identity_ms} ms`,in:{WebIdentityToken:"<your Okta access token>"},out:{user:tr.person.user,team:tr.person.team,web_identity:tr.person.web_identity}}];
+      DIO.dsts=(tr.mints||[]).length?[{label:"GetWebIdentityToken",in:{Audience:["https://api.openai.com/v1"],DurationSeconds:900},out:tr.mints[0].claims}]:[{label:"not called",in:null,out:"the SDK reused its cached OpenAI token"}];
+      if(tr.model) DIO.dmodel=[{label:"chat/completions",in:{model:tr.model.model_id,endpoint:tr.model.endpoint},out:{answer:d.answer,tools_used:tr.model.tools_used}}];
+      if(d.ok){ dbubble(`<div class="whitespace-pre-line">${esc(d.answer)}</div>`); $("#dflow-status").textContent="done"; }
+      else { dbubble(refusal("direct",d),"bad"); $("#dflow-status").textContent="refused"; }
+      $("#dticker").textContent=`done · as ${tr.person?.session||"?"}`; pollEvidence(); setTimeout(()=>testVerdict("direct",d),50); if(_panel) openNodePanel(_panel); });
+    else if(ev.kind==="error") enq(()=>dbubble(`<div class="text-[13px] text-rose-800">${esc(ev.text)}</div>`)); else if(ev.kind==="done") enq(()=>{ BUSY=false; renderDLive(); },10); }); }
+function dUse(i){ $("#dchat-input").value=DPROMPTS[i]; dsend(); }
+$("#dbtn-send").onclick=dsend; $("#dchat-input").addEventListener("keydown",e=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) dsend(); });
+
+// ---------------- destroy ----------------
+function renderDestroy(){ const c=t=>`<code class="rounded bg-zinc-100 px-1.5 py-0.5 font-mono">${t}</code>`;
+  $("#destroy-body").innerHTML=`<div class="text-sm text-zinc-700">Run in reverse order, from <span class="font-mono">OpenAIFederation/</span>:</div>
+    <ol class="mt-2 list-decimal space-y-1 pl-5 text-[13.5px] text-zinc-700"><li>${c("python agent_direct_deploy.py down")}: Direct agent Runtime + its role</li><li>${c("python agent_deploy.py down")}: Runtime, AgentCore Identity providers + workload identity, runtime role</li><li>${c("python gateway/translator_setup.py down")}: the translator + its role</li><li>${c("python gateway/gateway_obo.py down")}: Cedar</li><li>${c("python gateway/gateway_setup.py down")}: Gateway, targets, translators, team roles</li></ol>
+    ${sec("left in place · remove by hand if you like")}<ul class="mt-1 space-y-1 text-[13.5px] text-zinc-600"><li>· Okta: AI agent ${c("wif-openai-agent")} + its app, server ${c("wif-gateway")}, scope on ${c("wif-openai-users")}, ${c("wif-*")} groups</li><li>· KMS key ${c("alias/openai-wif-agent")} (schedule deletion), S3 code bucket</li><li>· OpenAI: identity provider and mappings · outbound identity federation (account-wide)</li></ul>`; }
+
+// ---------------- boot ----------------
+async function loadClaims(){ try{ const j=await (await fetch("/api/claims")).json(); CLAIMS=j.id_token?j:null; }catch(_){ CLAIMS=null; } }
+async function refresh(){ try{ STATUS=await (await fetch("/api/status")).json(); }catch(_){ STATUS={error:"console server not reachable"}; }
+  renderHeader(); if(STATUS.user&&!CLAIMS) loadClaims(); if(!STATUS.user) CLAIMS=null;
+  if(!BUSY) ({sokta:()=>renderSetup("sokta"),saws:()=>renderSetup("saws"),sopenai:()=>renderSetup("sopenai"),deploy:renderDeploy,live:renderLive,destroy:renderDestroy,arch:()=>{ if(ARCHTAB!=="p2") renderArch(); },darch:()=>{ if(DARCHTAB!=="p2") renderDArch(); },dlive:renderDLive}[view]||(()=>{}))(); if(view==="uml") renderUML(); }
+addEventListener("hashchange",()=>{ const h=location.hash.slice(1); if(h!==view&&NAV.some(n=>n.id===h)) setView(h); });
+const hv=location.hash.slice(1); if(hv==="map") ARCHTAB="p2"; setView(NAV.some(n=>n.id===hv)?hv:hv==="map"?"arch":"uml"); refresh(); loadEvidence(); setInterval(()=>{ if(!BUSY) refresh(); },10000);
+</script>
+</body>
+</html>
